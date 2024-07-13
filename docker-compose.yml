@@ -1,0 +1,11 @@
+services:
+  app:
+    image: gensound
+    build: .
+    container_name: my-running-app
+    volumes:
+      - .:/usr/src/app
+      - ./audio:/audio
+      - ./output:/usr/src/app/output
+    command: python /usr/src/app/main.py
+    tty: true
