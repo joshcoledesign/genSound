@@ -19,7 +19,7 @@ print(f"Color 2 HSL: {color2_hsl}")
 print(f"Color 3 HSL: {color3_hsl}")
 
 # Load the audio file
-audio_path = 'audio/audio001.mp3'
+audio_path = "audio/audio001.mp3"
 y, sr = load_audio(audio_path)
 
 # Analyze the audio
@@ -30,17 +30,18 @@ print(f"Max Amplitude: {max(amplitudes) if amplitudes else 'N/A'}")
 print(f"Max Frequency: {max(frequencies) if frequencies else 'N/A'}")
 
 # Define image size
-image_width = 250
-image_height = 250
+image_width = 1920
+image_height = 1080
 canvas = create_canvas(image_width, image_height)
 
 # Define the size of each pixel square
-pixel_size = 10
+pixel_size = 5
 
 # Calculate the number of squares needed horizontally and vertically
 objects_per_row = image_width // pixel_size
 objects_per_column = image_height // pixel_size
 total_objects = objects_per_row * objects_per_column
+
 
 # Ensure we have exactly the number of data points as total_objects
 # Truncate or interpolate data to match total_objects
@@ -48,12 +49,19 @@ def adjust_data_length(data, target_length):
     if len(data) > target_length:
         return data[:target_length]
     elif len(data) < target_length:
-        return np.interp(np.linspace(0, len(data)-1, target_length), np.arange(len(data)), data)
+        return np.pad(data, (0, target_length - len(data)), mode="edge")
     return data
+
 
 scaled_amplitudes = adjust_data_length(amplitudes, total_objects)
 scaled_frequencies = adjust_data_length(frequencies, total_objects)
 notes = adjust_data_length(notes, total_objects)
+
+# Debug lengths
+print(f"Length of scaled_amplitudes: {len(scaled_amplitudes)}")
+print(f"Length of scaled_frequencies: {len(scaled_frequencies)}")
+print(f"Length of notes: {len(notes)}")
+print(f"Total objects: {total_objects}")
 
 # Iterate over the audio data and generate the artwork
 for i in range(total_objects):
@@ -66,14 +74,16 @@ for i in range(total_objects):
 
     # Debugging information
     if i < 10:
-        print(f"Square {i}: Amplitude = {amplitude}, Frequency = {frequency}, Note = {note}")
+        print(
+            f"Square {i}: Amplitude = {amplitude}, Frequency = {frequency}, Note = {note}"
+        )
 
     # Choose base hue based on note range
-    if note.startswith(('C', 'D')):
+    if note.startswith(("C", "D")):
         base_color_hsl = color1_hsl
-    elif note.startswith(('E', 'F', 'G')):
+    elif note.startswith(("E", "F", "G")):
         base_color_hsl = color2_hsl
-    elif note.startswith(('A', 'B')):
+    elif note.startswith(("A", "B")):
         base_color_hsl = color3_hsl
     else:
         base_color_hsl = color1_hsl  # Default to color1 if note is not identified
@@ -98,10 +108,10 @@ for i in range(total_objects):
     draw_pixel(canvas, x, y, color_rgb, pixel_size)
 
 # Determine output path based on environment
-if os.getenv('DOCKER_ENV'):
-    output_path = '/usr/src/app/output/generated_art.png'
+if os.getenv("DOCKER_ENV"):
+    output_path = "/usr/src/app/output/generated_art.png"
 else:
-    output_path = 'output/generated_art.png'
+    output_path = "output/generated_art.png"
 
 # Save the generated artwork
 save_canvas(canvas, output_path)

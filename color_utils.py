@@ -1,7 +1,6 @@
-# color_utils.py
-
 import numpy as np
 from matplotlib.colors import rgb_to_hsv, hsv_to_rgb
+
 
 def rgb_to_hsl(rgb_color):
     rgb_normalized = np.array(rgb_color) / 255.0
@@ -9,8 +8,9 @@ def rgb_to_hsl(rgb_color):
     hsl = np.zeros_like(hsv)
     hsl[0] = hsv[0] * 360  # Hue
     hsl[1] = hsv[1]  # Saturation
-    hsl[2] = (2 - hsv[1]) * hsv[2] / 2  # Convert Value to Lightness
+    hsl[2] = (2 - hsv[1]) * hsv[2] / 2  # Lightness
     return hsl
+
 
 def hsl_to_rgb(h, s, l):
     c = (1 - abs(2 * l - 1)) * s

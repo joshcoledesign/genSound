@@ -2,10 +2,10 @@ services:
   app:
     image: gensound
     build: .
-    container_name: my-running-app
+    container_name: gensoundapp
     volumes:
       - .:/usr/src/app
       - ./audio:/audio
       - ./output:/usr/src/app/output
-    command: python /usr/src/app/main.py
+    command: /bin/sh -c "while sleep 1000; do :; done"
     tty: true

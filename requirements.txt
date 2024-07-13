@@ -1,5 +1,6 @@
 numpy<2.0.0
-matplotlib
+pydub
 librosa
-Pillow
-
+pillow
+matplotlib
+black

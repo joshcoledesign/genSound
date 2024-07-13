@@ -1,0 +1,21 @@
+# Ignore the virtual environment directory
+.venv/
+
+# Ignore other typical Python files that shouldn't be in version control
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore local development settings
+.idea/
+.vscode/
+.env
+*.env
+
+# Ignore MacOS system files
+.DS_Store
+
+# Ignore logs
+*.log
+
