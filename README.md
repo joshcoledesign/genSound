@@ -4,7 +4,7 @@ This project generates artwork based on audio analysis. The project is structure
 
 ## Project Structure
 
-\`\`\`
+```
 . 
 ├── Dockerfile 
 ├── README.md 
@@ -38,7 +38,7 @@ This project generates artwork based on audio analysis. The project is structure
     ├── audio_utils.py
     ├── color_utils.py
     └── drawing_utils.py
-\`\`\`
+```
 
 ## Setup
 
