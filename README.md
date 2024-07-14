@@ -5,7 +5,7 @@ This project generates artwork based on audio analysis. The project is structure
 ## Project Structure
 
 \`\`\`
-.
+.  
 ├── Dockerfile  
 ├── README.md  
 ├── __pycache__  
