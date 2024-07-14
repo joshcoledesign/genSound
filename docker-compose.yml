@@ -1,11 +1,20 @@
+version: '3.8'
+
 services:
   app:
-    image: gensound
-    build: .
-    container_name: gensoundapp
+    build:
+      context: .
     volumes:
       - .:/usr/src/app
-      - ./audio:/audio
-      - ./output:/usr/src/app/output
-    command: /bin/sh -c "while sleep 1000; do :; done"
+      - ./shared:/usr/src/app/shared
+    environment:
+      - PROJECT=${PROJECT}
+    command: >
+      sh -c "
+      if [ -n \"$${PROJECT}\" ]; then
+        python /usr/src/app/$${PROJECT}/main_$${PROJECT}.py;
+      else
+        while :; do sleep 1000; done;
+      fi
+      "
     tty: true

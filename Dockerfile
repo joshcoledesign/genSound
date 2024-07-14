@@ -14,5 +14,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the working directory contents into the container at /usr/src/app
 COPY . .
 
+# Set the PYTHONPATH environment variable
+ENV PYTHONPATH "${PYTHONPATH}:/usr/src/app/shared"
+
 # Run the application
 CMD ["python", "./main.py"]
