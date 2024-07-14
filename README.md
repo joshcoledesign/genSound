@@ -6,15 +6,15 @@ This project generates artwork based on audio analysis. The project is structure
 
 \`\`\`
 .
-├── Dockerfile
-├── README.md
-├── __pycache__
-│   ├── audio_utils.cpython-312.pyc
-│   ├── audio_utils.cpython-39.pyc
-│   ├── color_utils.cpython-312.pyc
-│   ├── color_utils.cpython-39.pyc
-│   ├── drawing_utils.cpython-312.pyc
-│   └── drawing_utils.cpython-39.pyc
+├── Dockerfile  
+├── README.md  
+├── __pycache__  
+│   ├── audio_utils.cpython-312.pyc  
+│   ├── audio_utils.cpython-39.pyc  
+│   ├── color_utils.cpython-312.pyc  
+│   ├── color_utils.cpython-39.pyc  
+│   ├── drawing_utils.cpython-312.pyc  
+│   └── drawing_utils.cpython-39.pyc  
 ├── docker-compose.yml
 ├── proj001
 │   ├── main_proj001.py
