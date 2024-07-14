@@ -9,32 +9,16 @@ This project generates artwork based on audio analysis. The project is structure
 ├── Dockerfile 
 ├── README.md 
 ├── __pycache__  
-│   ├── audio_utils.cpython-312.pyc  
-│   ├── audio_utils.cpython-39.pyc  
-│   ├── color_utils.cpython-312.pyc  
-│   ├── color_utils.cpython-39.pyc  
-│   ├── drawing_utils.cpython-312.pyc  
-│   └── drawing_utils.cpython-39.pyc  
 ├── docker-compose.yml
 ├── proj001
 │   ├── main_proj001.py
 │   └── output
-│       ├── generated_art0001.png
-│       ├── generated_art0002.png
-│       ├── generated_art0003.png
-│       ├── generated_art0004.png
-│       ├── generated_art0005.png
-│       ├── generated_art0006.png
-│       └── generated_art0007.png
 ├── proj002
 │   ├── main_proj002.py
 │   └── output
 ├── requirements.txt
 └── shared
     ├── audio
-    │   ├── audio001.mp3
-    │   ├── audio002.mp3
-    │   └── audio003.mp3
     ├── audio_utils.py
     ├── color_utils.py
     └── drawing_utils.py
