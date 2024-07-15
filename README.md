@@ -231,7 +231,3 @@ This project is licensed under the MIT License.
 
 Contributions are welcome! Please open an issue or submit a pull request for any improvements.
 
-### Contact
-
-For any questions, please contact josh@carbonandcole.com.
-
