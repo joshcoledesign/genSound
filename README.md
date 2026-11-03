@@ -37,6 +37,7 @@ genSound/
 ├── layout_utils.py    # Orders in which time fills the grid (rows, rings, Hilbert curve, ...)
 ├── export_playground_data.py  # Saves per-window analysis for the color playground
 ├── playground/        # Browser color playground (index.html; data/ is generated)
+├── examples/          # Script to download three openly licensed example tracks, with credits
 ├── audio/             # Put your own audio here (ignored by git)
 ├── output/            # Generated PNG artwork lands here (ignored by git)
 ├── requirements.txt
@@ -46,7 +47,7 @@ genSound/
 └── THIRD_PARTY_NOTICES.md
 ```
 
-genSound does not include sample music. Use your own recordings, or tracks whose license lets you share what you make from them.
+genSound does not store music in the repository. Three openly licensed example tracks (piano, orchestra and electronic) can be downloaded with `python examples/fetch_examples.py`; see [examples/README.md](examples/README.md) for credits and licenses. For anything else, use your own recordings, or tracks whose license lets you share what you make from them.
 
 ---
 
@@ -116,12 +117,21 @@ That is 250,000 overlapping windows and takes about 20 seconds for a 3-minute tr
 
 ### Color playground
 
-`playground/index.html` is a browser tool for trying palettes and color rules live on the rings and Hilbert layouts. It reads analysis data that genSound exports once for each file in `audio/` (250,000 windows each, about 1 MB):
+`playground/index.html` is a browser tool for trying palettes and color rules live on the rings and Hilbert layouts. It reads analysis data that genSound exports once per track (250,000 windows each, about 1 MB). To try it with the example tracks:
 
 ```bash
-python export_playground_data.py
+python examples/fetch_examples.py
+```
+
+```bash
+python export_playground_data.py examples/audio
+```
+
+```bash
 python -m http.server 8765 --directory playground
 ```
+
+With no arguments, `export_playground_data.py` exports every file in `audio/`.
 
 Then open http://localhost:8765. With the "genSound today" preset, its images match `main.py --size 500 --pixel-size 1 --fit` pixel for pixel (within 1 color level of rounding). The data files are not committed; rerun the export to recreate them.
 

@@ -1,7 +1,11 @@
 # export_playground_data.py
-# Analyze each audio file in audio/ once and save the per-window values the color
-# playground (playground/index.html) needs, so colors can change instantly.
+# Analyze audio files once and save the per-window values the color playground
+# (playground/index.html) needs, so colors can change instantly.
+#
+#   python export_playground_data.py                    # every file in audio/
+#   python export_playground_data.py examples/audio     # the example tracks
 
+import argparse
 import base64
 import glob
 import json
@@ -17,9 +21,18 @@ AUDIO_TYPES = ('.mp3', '.wav', '.flac', '.ogg', '.m4a')
 def encode(values):
     return base64.b64encode(np.asarray(values, dtype=np.uint8).tobytes()).decode('ascii')
 
-paths = sorted(p for p in glob.glob('audio/*') if p.lower().endswith(AUDIO_TYPES))
+parser = argparse.ArgumentParser(description='Export analysis data for the color playground.')
+parser.add_argument('sources', nargs='*', default=['audio'], help='audio files or folders (default: audio)')
+args = parser.parse_args()
+
+paths = []
+for source in args.sources:
+    if os.path.isdir(source):
+        paths += sorted(p for p in glob.glob(os.path.join(source, '*')) if p.lower().endswith(AUDIO_TYPES))
+    elif os.path.isfile(source):
+        paths.append(source)
 if not paths:
-    raise SystemExit('No audio files found in audio/. Add some, then run this again.')
+    raise SystemExit(f'No audio files found in {", ".join(args.sources)}. Add some, then run this again.')
 
 os.makedirs('playground/data', exist_ok=True)
 names = []

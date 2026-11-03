@@ -24,3 +24,6 @@ audio/*
 !audio/README.md
 output/
 generated_art.png
+
+# Example tracks (download with examples/fetch_examples.py)
+examples/audio/

@@ -37,9 +37,23 @@ body {
 header {
   grid-column: 1 / -1;
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 8px 20px;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 4px;
+}
+.thesis {
+  margin: 0;
+  max-width: 44ch;
+  font-size: 19px;
+  line-height: 1.35;
+  font-weight: 500;
+  text-wrap: balance;
+}
+.about {
+  margin: 0;
+  max-width: 72ch;
+  color: var(--muted);
+  line-height: 1.55;
 }
 h1 {
   margin: 0;
@@ -140,6 +154,8 @@ canvas {
   font: 11px/1.5 var(--font-data); color: var(--muted); overflow-x: auto; max-height: 220px;
 }
 .loading { color: var(--muted); font-size: 13px; }
+.credits { max-width: 72ch; line-height: 1.5; }
+.credits a { color: var(--accent); }
 @media (max-width: 900px) {
   .app { grid-template-columns: minmax(0, 1fr); }
   .stage { order: -1; }
@@ -153,6 +169,8 @@ canvas {
 <div class="app">
   <header>
     <h1>genSound Color Lab</h1>
+    <p class="thesis">A song unfolds over minutes. genSound turns it into a single image, so the whole piece can be seen at once.</p>
+    <p class="about">It listens to a track in 250,000 overlapping moments, each a tenth of a second long, and measures three things in every one: the note being played, how loud it is, and its strongest frequency. Each moment becomes one point of color. By default the note picks the hue, loudness sets the saturation, and frequency sets the lightness; silence stays black. The lab shows the same analysis two ways: as rings that grow outward from the opening, and as a Hilbert curve that keeps nearby moments together. Change the palette and the color rules to see how each one changes the picture.</p>
     <span class="stats" id="stats">Loading…</span>
   </header>
 
@@ -257,6 +275,8 @@ canvas {
       </div>
       <pre id="settings-json"></pre>
     </div>
+
+    <p class="hint credits">Example tracks: Chopin, Nocturne Op. 9 No. 2, performed by Peter Johnston via Musopen (CC0). Beethoven, Symphony No. 8, iv. Allegro vivace, Musopen recording (public domain). "Hitman" by Kevin MacLeod (incompetech.com), licensed under <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>. All from Wikimedia Commons.</p>
   </main>
 </div>
 
