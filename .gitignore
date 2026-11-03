@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Claude Code
+.claude/
+
+# Environment
+.env
+.venv/
+venv/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Playground data (regenerate with export_playground_data.py)
+playground/data/
+
+# Your own audio and renders (not distributed with the repository)
+audio/*
+!audio/README.md
+output/
+generated_art.png

@@ -1,0 +1,633 @@
+<meta charset="utf-8">
+<title>genSound Color Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Schibsted+Grotesk:wght@400;500;700&display=swap">
+<style>
+/* Layout: a quiet control rail on the left, the two shortlisted layouts side by side as the work surface. */
+:root {
+  --bg: #121316;
+  --panel: #191b1f;
+  --raise: #22252a;
+  --line: #2c3036;
+  --fg: #e6e7e9;
+  --muted: #959ba5;
+  --accent: #5fe3ee;
+  --font-ui: "Schibsted Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-data: "DM Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font: 14px/1.45 var(--font-ui);
+}
+.app {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 24px;
+  padding-block: 20px 32px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  max-width: 1480px;
+  margin: 0 auto;
+}
+header {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 20px;
+}
+h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.stats {
+  font: 12px/1.4 var(--font-data);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+fieldset {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  padding: 12px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+legend {
+  padding: 0 6px;
+  margin-left: -6px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+label, .row-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+.value { font: 12px var(--font-data); color: var(--muted); font-variant-numeric: tabular-nums; }
+select, button, input[type="number"] {
+  font: inherit;
+  font-size: 13px;
+  color: var(--fg);
+  background: var(--raise);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 5px 8px;
+}
+select { min-width: 0; max-width: 190px; }
+button { cursor: pointer; }
+button:hover, select:hover { border-color: var(--muted); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+.range { display: flex; flex-direction: column; gap: 2px; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.hint { margin: 0; font-size: 12px; color: var(--muted); }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.seg button { flex: 1; border: 0; border-radius: 0; background: transparent; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--raise); color: var(--fg); }
+.stops { display: flex; flex-wrap: wrap; gap: 6px; }
+.stop { position: relative; }
+.stop input[type="color"] {
+  width: 34px; height: 34px; padding: 0; border: 1px solid var(--line); border-radius: 4px;
+  background: none; cursor: pointer;
+}
+.stop button {
+  position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; padding: 0;
+  border-radius: 50%; font-size: 11px; line-height: 16px; display: none;
+}
+.stop:hover button, .stop:focus-within button { display: block; }
+.btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.presets { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.presets button { text-align: left; }
+.stage { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.boards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+figure { margin: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+figcaption { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+figcaption span:last-child { color: var(--muted); font-size: 12px; }
+canvas {
+  width: 100%; max-width: 100%; aspect-ratio: 1; height: auto; display: block;
+  background: #000; border-radius: 3px;
+}
+.key { display: flex; flex-direction: column; gap: 6px; }
+.key-strip { display: grid; gap: 2px; }
+.key-strip div { height: 26px; border-radius: 2px; }
+.key-labels { display: grid; gap: 2px; font: 11px var(--font-data); color: var(--muted); text-align: center; }
+.key-ends { display: flex; justify-content: space-between; font: 11px var(--font-data); color: var(--muted); }
+.settings { display: flex; flex-direction: column; gap: 6px; }
+.settings pre {
+  margin: 0; padding: 10px; background: var(--raise); border: 1px solid var(--line); border-radius: 4px;
+  font: 11px/1.5 var(--font-data); color: var(--muted); overflow-x: auto; max-height: 220px;
+}
+.loading { color: var(--muted); font-size: 13px; }
+@media (max-width: 900px) {
+  .app { grid-template-columns: minmax(0, 1fr); }
+  .stage { order: -1; }
+  header { order: -2; }
+}
+@media (max-width: 560px) {
+  .boards { grid-template-columns: minmax(0, 1fr); }
+}
+</style>
+
+<div class="app">
+  <header>
+    <h1>genSound Color Lab</h1>
+    <span class="stats" id="stats">Loading…</span>
+  </header>
+
+  <aside class="rail">
+    <fieldset>
+      <legend>Track</legend>
+      <label for="track">Audio file
+        <select id="track"></select>
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Presets</legend>
+      <div class="presets" id="presets"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Palette</legend>
+      <div class="stops" id="stops"></div>
+      <div class="btns">
+        <button type="button" id="add-stop">Add color</button>
+        <button type="button" id="wheel">Spread around wheel</button>
+      </div>
+      <div class="row-label">Between colors
+        <div class="seg" role="group" aria-label="Between colors">
+          <button type="button" id="blend-hard" aria-pressed="true">Hard steps</button>
+          <button type="button" id="blend-smooth" aria-pressed="false">Blend</button>
+        </div>
+      </div>
+      <p class="hint">The hue source picks a place on this palette. Hover a color to remove it.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Hue</legend>
+      <label for="hue-source">Picked by <select id="hue-source"></select></label>
+      <label for="shift-source">Shifted by <select id="shift-source"></select></label>
+      <div class="range">
+        <label for="shift-amount">Shift range <span class="value" id="shift-amount-v"></span></label>
+        <input type="range" id="shift-amount" min="0" max="180" step="1">
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Saturation</legend>
+      <label for="sat-source">Driven by <select id="sat-source"></select></label>
+      <div class="pair">
+        <div class="range">
+          <label for="sat-lo">Low end <span class="value" id="sat-lo-v"></span></label>
+          <input type="range" id="sat-lo" min="0" max="1" step="0.01">
+        </div>
+        <div class="range">
+          <label for="sat-hi">High end <span class="value" id="sat-hi-v"></span></label>
+          <input type="range" id="sat-hi" min="0" max="1" step="0.01">
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Lightness</legend>
+      <label for="light-source">Driven by <select id="light-source"></select></label>
+      <div class="pair">
+        <div class="range">
+          <label for="light-lo">Low end <span class="value" id="light-lo-v"></span></label>
+          <input type="range" id="light-lo" min="0" max="1" step="0.01">
+        </div>
+        <div class="range">
+          <label for="light-hi">High end <span class="value" id="light-hi-v"></span></label>
+          <input type="range" id="light-hi" min="0" max="1" step="0.01">
+        </div>
+      </div>
+      <p class="hint">Set Low end above High end to invert. With "Fixed", Low end is used.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Silence</legend>
+      <label for="silence">Silent windows <span class="stop"><input type="color" id="silence"></span></label>
+    </fieldset>
+  </aside>
+
+  <main class="stage">
+    <div class="boards">
+      <figure>
+        <figcaption><span>Rings</span><span>start at center, end at corners</span></figcaption>
+        <canvas id="rings" width="500" height="500" aria-label="Track rendered in the rings layout"></canvas>
+      </figure>
+      <figure>
+        <figcaption><span>Hilbert</span><span>nearby moments stay nearby</span></figcaption>
+        <canvas id="hilbert" width="500" height="500" aria-label="Track rendered in the Hilbert layout"></canvas>
+      </figure>
+    </div>
+
+    <div class="key">
+      <div class="row-label"><span id="key-title">Hue key</span></div>
+      <div class="key-strip" id="key-strip"></div>
+      <div class="key-labels" id="key-labels"></div>
+      <div class="key-ends" id="key-ends"></div>
+    </div>
+
+    <div class="settings">
+      <div class="row-label">Settings
+        <button type="button" id="copy">Copy settings</button>
+      </div>
+      <pre id="settings-json"></pre>
+    </div>
+  </main>
+</div>
+
+<script>
+const SIDE = 500, N = SIDE * SIDE;
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const SOURCES = {
+  gensound: 'Note group (C–D#, E–G#, A–B)',
+  note: 'Note name (12 notes)',
+  pitch: 'Pitch, low to high',
+  octave: 'Octave',
+  loudness: 'Loudness',
+  frequency: 'Strongest frequency',
+  time: 'Time in track',
+};
+const HUE_SOURCES = ['gensound', 'note', 'pitch', 'octave', 'loudness', 'frequency', 'time'];
+const SHIFT_SOURCES = ['none', 'pitch', 'octave', 'loudness', 'frequency', 'time'];
+const SL_SOURCES = ['palette', 'constant', 'loudness', 'frequency', 'pitch', 'octave', 'time'];
+const EXTRA = { none: 'Nothing', palette: 'Palette color', constant: 'Fixed' };
+
+const GENSOUND = ['#f723e9', '#17edfc', '#9dfc17'];
+const PRESETS = {
+  'genSound today': { palette: GENSOUND, blend: 'hard', hue: 'gensound', shift: 'none', shiftAmount: 30,
+    sat: 'loudness', satLo: 0.5, satHi: 1, light: 'frequency', lightLo: 0.3, lightHi: 0.6, silence: '#000000' },
+  'Twelve notes': { palette: wheel(12, 304, 0.9, 0.55), blend: 'hard', hue: 'note', shift: 'none', shiftAmount: 30,
+    sat: 'loudness', satLo: 0.5, satHi: 1, light: 'frequency', lightLo: 0.3, lightHi: 0.6, silence: '#000000' },
+  'Pitch gradient': { palette: GENSOUND, blend: 'smooth', hue: 'pitch', shift: 'none', shiftAmount: 30,
+    sat: 'loudness', satLo: 0.4, satHi: 1, light: 'frequency', lightLo: 0.25, lightHi: 0.65, silence: '#000000' },
+  'One hue, loud is light': { palette: ['#17edfc'], blend: 'hard', hue: 'gensound', shift: 'pitch', shiftAmount: 40,
+    sat: 'frequency', satLo: 0.3, satHi: 1, light: 'loudness', lightLo: 0.12, lightHi: 0.7, silence: '#000000' },
+};
+
+let settings = loadSettings() || structuredClone(PRESETS['genSound today']);
+let track = null;
+const cache = {};
+
+// ---------- color math (matches genSound's hsl_to_rgb) ----------
+function hexToHsl(hex) {
+  const r = parseInt(hex.slice(1, 3), 16) / 255, g = parseInt(hex.slice(3, 5), 16) / 255, b = parseInt(hex.slice(5, 7), 16) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2;
+  if (max === min) return [0, 0, l];
+  const d = max - min, s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return [h * 60, s, l];
+}
+function hslToRgb(h, s, l, out, o) {
+  h = ((h % 360) + 360) % 360;
+  const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = l - c / 2;
+  let r, g, b;
+  if (h < 60) [r, g, b] = [c, x, 0];
+  else if (h < 120) [r, g, b] = [x, c, 0];
+  else if (h < 180) [r, g, b] = [0, c, x];
+  else if (h < 240) [r, g, b] = [0, x, c];
+  else if (h < 300) [r, g, b] = [x, 0, c];
+  else [r, g, b] = [c, 0, x];
+  out[o] = (r + m) * 255; out[o + 1] = (g + m) * 255; out[o + 2] = (b + m) * 255;
+}
+function hslToHex(h, s, l) {
+  const t = [0, 0, 0]; hslToRgb(h, s, l, t, 0);
+  return '#' + t.map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
+}
+function wheel(count, startHue, s, l) {
+  return Array.from({ length: count }, (_, k) => hslToHex(startHue + k * 360 / count, s, l));
+}
+
+// ---------- layouts (same orderings as genSound's layout_utils.py) ----------
+function ringsOrder(side) {
+  const idx = new Int32Array(side * side), ring = new Float64Array(side * side), ang = new Float64Array(side * side);
+  const mid = (side - 1) / 2;
+  for (let r = 0; r < side; r++) for (let c = 0; c < side; c++) {
+    const k = r * side + c, dc = c - mid, dr = r - mid;
+    idx[k] = k; ring[k] = Math.floor(Math.hypot(dc, dr)); ang[k] = Math.atan2(dr, dc);
+  }
+  return Int32Array.from(Array.from(idx).sort((a, b) => ring[a] - ring[b] || ang[a] - ang[b]));
+}
+// Generalized Hilbert curve adapted from gilbert (https://github.com/jakubcerveny/gilbert),
+// Copyright (c) 2018 Jakub Červený, BSD 2-Clause License; see THIRD_PARTY_NOTICES.md.
+function hilbertOrder(w, h) {
+  const out = new Int32Array(w * h); let n = 0;
+  const sgn = v => (v > 0) - (v < 0);
+  function g(x, y, ax, ay, bx, by) {
+    const W = Math.abs(ax + ay), H = Math.abs(bx + by);
+    const dax = sgn(ax), day = sgn(ay), dbx = sgn(bx), dby = sgn(by);
+    if (H === 1) { for (let i = 0; i < W; i++) { out[n++] = y * w + x; x += dax; y += day; } return; }
+    if (W === 1) { for (let i = 0; i < H; i++) { out[n++] = y * w + x; x += dbx; y += dby; } return; }
+    let ax2 = Math.floor(ax / 2), ay2 = Math.floor(ay / 2), bx2 = Math.floor(bx / 2), by2 = Math.floor(by / 2);
+    const w2 = Math.abs(ax2 + ay2), h2 = Math.abs(bx2 + by2);
+    if (2 * W > 3 * H) {
+      if (w2 % 2 && W > 2) { ax2 += dax; ay2 += day; }
+      g(x, y, ax2, ay2, bx, by);
+      g(x + ax2, y + ay2, ax - ax2, ay - ay2, bx, by);
+    } else {
+      if (h2 % 2 && H > 2) { bx2 += dbx; by2 += dby; }
+      g(x, y, bx2, by2, ax2, ay2);
+      g(x + bx2, y + by2, ax, ay, bx - bx2, by - by2);
+      g(x + (ax - dax) + (bx2 - dbx), y + (ay - day) + (by2 - dby), -bx2, -by2, -(ax - ax2), -(ay - ay2));
+    }
+  }
+  if (w >= h) g(0, 0, w, 0, 0, h); else g(0, 0, 0, h, w, 0);
+  return out;
+}
+const LAYOUTS = { rings: ringsOrder(SIDE), hilbert: hilbertOrder(SIDE, SIDE) };
+
+// ---------- track data ----------
+function decode(b64) {
+  const bin = atob(b64), out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+function rankOf(values, voiced) {
+  // Percentile rank among voiced windows; ties share their average rank
+  const ids = [];
+  for (let i = 0; i < values.length; i++) if (voiced[i]) ids.push(i);
+  ids.sort((a, b) => values[a] - values[b]);
+  const out = new Float32Array(values.length), last = ids.length - 1 || 1;
+  for (let s = 0; s < ids.length;) {
+    let e = s; while (e + 1 < ids.length && values[ids[e + 1]] === values[ids[s]]) e++;
+    const r = (s + e) / 2 / last;
+    for (let k = s; k <= e; k++) out[ids[k]] = r;
+    s = e + 1;
+  }
+  return out;
+}
+async function loadTrack(name) {
+  if (cache[name]) return cache[name];
+  const raw = await (await fetch(`data/${name}.json`)).json();
+  const loud = decode(raw.loudness), freq = decode(raw.frequency), midiHalf = decode(raw.midi_half), noteIndex = decode(raw.note_index);
+  const voiced = new Uint8Array(N), midi = new Float32Array(N), octave = new Float32Array(N), pc = new Int8Array(N);
+  for (let i = 0; i < N; i++) {
+    voiced[i] = noteIndex[i] > 0 ? 1 : 0;
+    midi[i] = midiHalf[i] / 2;
+    const h = noteIndex[i] - 1;  // semitones above C0, exactly as genSound names notes
+    pc[i] = voiced[i] ? h % 12 : -1;
+    octave[i] = voiced[i] ? Math.floor(h / 12) : 0;
+  }
+  const src = {
+    loudness: Float32Array.from(loud, v => v / 255),
+    frequency: Float32Array.from(freq, v => v / 255),
+    pitch: rankOf(midi, voiced),
+    octave: new Float32Array(N),
+    note: new Float32Array(N),
+    gensound: new Float32Array(N),
+    time: Float32Array.from({ length: N }, (_, i) => i / (N - 1)),
+  };
+  let lo = Infinity, hi = -Infinity;
+  for (let i = 0; i < N; i++) if (voiced[i]) { lo = Math.min(lo, octave[i]); hi = Math.max(hi, octave[i]); }
+  for (let i = 0; i < N; i++) {
+    if (!voiced[i]) continue;
+    src.octave[i] = hi > lo ? (octave[i] - lo) / (hi - lo) : 0;
+    src.note[i] = (pc[i] + 0.5) / 12;
+    src.gensound[i] = (pc[i] <= 3 ? 0.5 : pc[i] <= 8 ? 1.5 : 2.5) / 3;
+  }
+  const t = { name, voiced, src, duration: raw.duration_s, windowMs: raw.window_ms, octaves: [lo, hi] };
+  cache[name] = t;
+  return t;
+}
+
+// ---------- rendering ----------
+function paletteAt(stopsHsl, v, smooth, out) {
+  const n = stopsHsl.length;
+  if (n === 1 || !smooth) {
+    const k = Math.min(n - 1, Math.max(0, Math.floor(v * n)));
+    out[0] = stopsHsl[k][0]; out[1] = stopsHsl[k][1]; out[2] = stopsHsl[k][2];
+    return;
+  }
+  const pos = Math.min(Math.max(v, 0), 1) * (n - 1), k = Math.min(n - 2, Math.floor(pos)), t = pos - k;
+  const a = stopsHsl[k], b = stopsHsl[k + 1];
+  let dh = b[0] - a[0];
+  if (dh > 180) dh -= 360; else if (dh < -180) dh += 360;
+  out[0] = a[0] + dh * t; out[1] = a[1] + (b[1] - a[1]) * t; out[2] = a[2] + (b[2] - a[2]) * t;
+}
+
+function colorWindows(t) {
+  const s = settings, rgb = new Uint8ClampedArray(N * 3), stops = s.palette.map(hexToHsl);
+  const hueV = t.src[s.hue], shiftV = s.shift === 'none' ? null : t.src[s.shift];
+  const satV = t.src[s.sat], lightV = t.src[s.light];
+  const sil = hexToHsl(s.silence), base = [0, 0, 0], tmp = [0, 0, 0];
+  hslToRgb(sil[0], sil[1], sil[2], tmp, 0);
+  for (let i = 0; i < N; i++) {
+    const o = i * 3;
+    if (!t.voiced[i]) { rgb[o] = tmp[0]; rgb[o + 1] = tmp[1]; rgb[o + 2] = tmp[2]; continue; }
+    paletteAt(stops, hueV[i], s.blend === 'smooth', base);
+    let h = base[0];
+    if (shiftV) h += s.shiftAmount * (shiftV[i] - 0.5) * 2;
+    const sat = s.sat === 'palette' ? base[1] : s.sat === 'constant' ? s.satLo : s.satLo + (s.satHi - s.satLo) * satV[i];
+    const light = s.light === 'palette' ? base[2] : s.light === 'constant' ? s.lightLo : s.lightLo + (s.lightHi - s.lightLo) * lightV[i];
+    hslToRgb(h, Math.min(1, Math.max(0, sat)), Math.min(1, Math.max(0, light)), rgb, o);
+  }
+  return rgb;
+}
+
+function paint(canvasId, order, rgb) {
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  const img = ctx.createImageData(SIDE, SIDE), px = img.data;
+  for (let i = 0; i < N; i++) {
+    const p = order[i] * 4, o = i * 3;
+    px[p] = rgb[o]; px[p + 1] = rgb[o + 1]; px[p + 2] = rgb[o + 2]; px[p + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+let frame = 0;
+function render() {
+  // Coalesce rapid slider input into one redraw; a timer also runs in hidden views
+  clearTimeout(frame);
+  frame = setTimeout(() => {
+    if (!track) return;
+    const rgb = colorWindows(track);
+    paint('rings', LAYOUTS.rings, rgb);
+    paint('hilbert', LAYOUTS.hilbert, rgb);
+    renderKey();
+    renderSettings();
+    saveSettings();
+  });
+}
+
+function renderKey() {
+  const s = settings, stops = s.palette.map(hexToHsl), strip = document.getElementById('key-strip');
+  const labels = document.getElementById('key-labels'), ends = document.getElementById('key-ends');
+  const midSat = s.sat === 'palette' ? null : s.sat === 'constant' ? s.satLo : (s.satLo + s.satHi) / 2;
+  const midLight = s.light === 'palette' ? null : s.light === 'constant' ? s.lightLo : (s.lightLo + s.lightHi) / 2;
+  const swatch = v => {
+    const b = [0, 0, 0]; paletteAt(stops, v, s.blend === 'smooth', b);
+    return hslToHex(b[0], midSat ?? b[1], midLight ?? b[2]);
+  };
+  const byNote = s.hue === 'note' || s.hue === 'gensound';
+  let cells;
+  if (byNote) {
+    cells = NOTE_NAMES.map((_, pc) => swatch(s.hue === 'note' ? (pc + 0.5) / 12 : (pc <= 3 ? 0.5 : pc <= 8 ? 1.5 : 2.5) / 3));
+    labels.innerHTML = NOTE_NAMES.map(n => `<span>${n}</span>`).join('');
+    ends.innerHTML = '';
+  } else {
+    cells = Array.from({ length: 48 }, (_, k) => swatch((k + 0.5) / 48));
+    labels.innerHTML = '';
+    const range = { pitch: ['lowest pitch', 'highest pitch'], octave: [`octave ${track?.octaves[0] ?? ''}`, `octave ${track?.octaves[1] ?? ''}`],
+      loudness: ['quietest', 'loudest'], frequency: ['lowest', 'highest'], time: ['start', 'end'] }[s.hue];
+    ends.innerHTML = `<span>${range[0]}</span><span>${range[1]}</span>`;
+  }
+  strip.style.gridTemplateColumns = labels.style.gridTemplateColumns = `repeat(${cells.length}, 1fr)`;
+  strip.innerHTML = cells.map(c => `<div style="background:${c}"></div>`).join('');
+  document.getElementById('key-title').textContent = `Hue key: ${SOURCES[s.hue]}` +
+    (midSat === null && midLight === null ? '' : ' (shown at mid saturation and lightness)');
+}
+
+function renderSettings() {
+  const s = settings;
+  const out = {
+    palette: s.palette, between_colors: s.blend === 'smooth' ? 'blend' : 'hard steps',
+    hue: { picked_by: s.hue, shifted_by: s.shift, shift_degrees: s.shiftAmount },
+    saturation: { driven_by: s.sat, low_end: s.satLo, high_end: s.satHi },
+    lightness: { driven_by: s.light, low_end: s.lightLo, high_end: s.lightHi },
+    silence: s.silence,
+  };
+  document.getElementById('settings-json').textContent = JSON.stringify(out, null, 2);
+}
+
+// ---------- controls ----------
+const $ = id => document.getElementById(id);
+function fillSelect(id, keys) {
+  $(id).innerHTML = keys.map(k => `<option value="${k}">${EXTRA[k] || SOURCES[k]}</option>`).join('');
+}
+fillSelect('hue-source', HUE_SOURCES);
+fillSelect('shift-source', SHIFT_SOURCES);
+fillSelect('sat-source', SL_SOURCES);
+fillSelect('light-source', SL_SOURCES);
+
+$('presets').innerHTML = Object.keys(PRESETS).map(n => `<button type="button" data-preset="${n}">${n}</button>`).join('');
+$('presets').addEventListener('click', e => {
+  const name = e.target.dataset.preset;
+  if (name) { settings = structuredClone(PRESETS[name]); syncControls(); render(); }
+});
+
+function renderStops() {
+  $('stops').innerHTML = settings.palette.map((c, k) =>
+    `<span class="stop"><input type="color" id="stop-${k}" value="${c}" aria-label="Palette color ${k + 1}">` +
+    (settings.palette.length > 1 ? `<button type="button" data-remove="${k}" aria-label="Remove color ${k + 1}">×</button>` : '') +
+    `</span>`).join('');
+}
+$('stops').addEventListener('input', e => {
+  const m = e.target.id.match(/^stop-(\d+)$/);
+  if (m) { settings.palette[+m[1]] = e.target.value; render(); }
+});
+$('stops').addEventListener('click', e => {
+  const k = e.target.dataset.remove;
+  if (k !== undefined) { settings.palette.splice(+k, 1); renderStops(); render(); }
+});
+$('add-stop').addEventListener('click', () => {
+  if (settings.palette.length >= 12) return;
+  const last = hexToHsl(settings.palette[settings.palette.length - 1]);
+  settings.palette.push(hslToHex(last[0] + 40, last[1] || 0.8, last[2] || 0.5));
+  renderStops(); render();
+});
+$('wheel').addEventListener('click', () => {
+  const first = hexToHsl(settings.palette[0]);
+  settings.palette = wheel(settings.palette.length, first[0], first[1] || 0.9, first[2] || 0.55);
+  renderStops(); render();
+});
+$('blend-hard').addEventListener('click', () => { settings.blend = 'hard'; syncControls(); render(); });
+$('blend-smooth').addEventListener('click', () => { settings.blend = 'smooth'; syncControls(); render(); });
+
+const BINDINGS = [
+  ['hue-source', 'hue'], ['shift-source', 'shift'], ['sat-source', 'sat'], ['light-source', 'light'],
+  ['shift-amount', 'shiftAmount', Number], ['sat-lo', 'satLo', Number], ['sat-hi', 'satHi', Number],
+  ['light-lo', 'lightLo', Number], ['light-hi', 'lightHi', Number], ['silence', 'silence'],
+];
+for (const [id, key, cast] of BINDINGS) {
+  $(id).addEventListener('input', e => {
+    settings[key] = cast ? cast(e.target.value) : e.target.value;
+    syncValues(); render();
+  });
+}
+function syncValues() {
+  $('shift-amount-v').textContent = `±${settings.shiftAmount}°`;
+  for (const k of ['sat-lo', 'sat-hi', 'light-lo', 'light-hi']) {
+    const key = { 'sat-lo': 'satLo', 'sat-hi': 'satHi', 'light-lo': 'lightLo', 'light-hi': 'lightHi' }[k];
+    $(k + '-v').textContent = settings[key].toFixed(2);
+  }
+  const fixedSat = settings.sat === 'palette', fixedLight = settings.light === 'palette';
+  $('sat-lo').disabled = $('sat-hi').disabled = fixedSat;
+  $('sat-hi').disabled = fixedSat || settings.sat === 'constant';
+  $('light-lo').disabled = fixedLight;
+  $('light-hi').disabled = fixedLight || settings.light === 'constant';
+  $('shift-amount').disabled = settings.shift === 'none';
+}
+function syncControls() {
+  for (const [id, key] of BINDINGS) $(id).value = settings[key];
+  $('blend-hard').setAttribute('aria-pressed', settings.blend !== 'smooth');
+  $('blend-smooth').setAttribute('aria-pressed', settings.blend === 'smooth');
+  renderStops(); syncValues();
+}
+
+$('copy').addEventListener('click', async () => {
+  const text = $('settings-json').textContent;
+  try { await navigator.clipboard.writeText(text); $('copy').textContent = 'Copied'; }
+  catch { const r = document.createRange(); r.selectNodeContents($('settings-json')); getSelection().removeAllRanges(); getSelection().addRange(r); $('copy').textContent = 'Selected, press Ctrl+C'; }
+  setTimeout(() => { $('copy').textContent = 'Copy settings'; }, 1800);
+});
+
+function saveSettings() { try { localStorage.setItem('gensound-lab-settings', JSON.stringify(settings)); } catch {} }
+function loadSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem('gensound-lab-settings'));
+    return s && Array.isArray(s.palette) && s.palette.length ? { ...PRESETS['genSound today'], ...s } : null;
+  } catch { return null; }
+}
+
+async function selectTrack(name) {
+  $('stats').textContent = `Loading ${name}…`;
+  try {
+    track = await loadTrack(name);
+  } catch {
+    $('stats').textContent = `Could not load ${name}. Run export_playground_data.py, then reload the page.`;
+    return;
+  }
+  const mins = Math.floor(track.duration / 60), secs = (track.duration % 60).toFixed(1).padStart(4, '0');
+  const hop = ((track.duration - track.windowMs / 1000) / (N - 1) * 1000).toFixed(2);
+  $('stats').textContent = `${name} · ${mins}:${secs} · ${N.toLocaleString()} windows of ${track.windowMs} ms, one every ${hop} ms`;
+  render();
+}
+$('track').addEventListener('change', e => selectTrack(e.target.value));
+
+async function start() {
+  syncControls();
+  let names = [];
+  try { names = (await (await fetch('data/manifest.json')).json()).tracks; } catch {}
+  if (!names.length) {
+    $('stats').textContent = 'No tracks yet. Put audio files in audio/, run export_playground_data.py, then reload.';
+    return;
+  }
+  $('track').innerHTML = names.map(n => `<option value="${n}">${n}</option>`).join('');
+  selectTrack(names[0]);
+}
+start();
+</script>
