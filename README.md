@@ -36,7 +36,7 @@ genSound/
 ├── drawing_utils.py   # Pillow canvas creation, pixel drawing, PNG save
 ├── layout_utils.py    # Orders in which time fills the grid (rows, rings, Hilbert curve, ...)
 ├── export_playground_data.py  # Saves per-window analysis for the color playground
-├── playground/        # Browser color playground (index.html; data/ is generated)
+├── playground/        # Browser version: index.html, analyzer.js (the analysis in JavaScript); data/ is generated
 ├── examples/          # Script to download three openly licensed example tracks, with credits
 ├── audio/             # Put your own audio here (ignored by git)
 ├── output/            # Generated PNG artwork lands here (ignored by git)
@@ -117,7 +117,11 @@ That is 250,000 overlapping windows and takes about 20 seconds for a 3-minute tr
 
 ### Color playground
 
-`playground/index.html` is a browser tool for trying palettes and color rules live on the rings and Hilbert layouts. It reads analysis data that genSound exports once per track (250,000 windows each, about 1 MB). To try it with the example tracks:
+`playground/index.html` is genSound in the browser. It shows the rings and Hilbert layouts side by side, each with a full-screen view, and lets you try palettes and color rules live.
+
+**Use your own audio:** choose or drop a file (MP3, WAV, OGG, M4A; up to 15 minutes). `playground/analyzer.js` runs genSound's analysis in a Web Worker, so the file never leaves the browser. It matches the Python version: on the example tracks, note names and silence agree in every window and loudness is identical. The one difference is that the strongest frequency is measured every 10 ms rather than once per window, which keeps a 3-minute track to about 10 seconds.
+
+**Example tracks:** the page also lists tracks exported ahead of time (250,000 windows each, about 1 MB). To export the example tracks:
 
 ```bash
 python examples/fetch_examples.py

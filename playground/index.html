@@ -137,8 +137,20 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .stage { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .boards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 figure { margin: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-figcaption { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
-figcaption span:last-child { color: var(--muted); font-size: 12px; }
+figcaption { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; }
+figcaption small { color: var(--muted); font-size: 12px; margin-left: 6px; }
+.fs { font-size: 12px; padding: 3px 8px; }
+.viewer {
+  position: fixed; inset: 0; z-index: 20; background: var(--bg);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  padding: calc(16px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+}
+.viewer[hidden] { display: none; }
+.viewer-bar { width: min(100%, calc(100vh - 96px)); display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 13px; }
+.viewer canvas {
+  width: min(100%, calc(100vh - 96px)); height: auto; aspect-ratio: 1; image-rendering: pixelated;
+  background: #000; border-radius: 3px;
+}
 canvas {
   width: 100%; max-width: 100%; aspect-ratio: 1; height: auto; display: block;
   background: #000; border-radius: 3px;
@@ -154,6 +166,17 @@ canvas {
   font: 11px/1.5 var(--font-data); color: var(--muted); overflow-x: auto; max-height: 220px;
 }
 .loading { color: var(--muted); font-size: 13px; }
+.upload { display: flex; flex-direction: column; gap: 8px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.file-button {
+  display: block; text-align: center; cursor: pointer; font-size: 13px; font-weight: 500;
+  padding: 7px 10px; border: 1px solid var(--accent); border-radius: 4px; color: var(--accent);
+}
+.file-button:hover { background: var(--raise); }
+#file:focus-visible + .file-button { outline: 2px solid var(--accent); outline-offset: 2px; }
+#file:disabled + .file-button { opacity: 0.5; cursor: progress; }
+progress { width: 100%; height: 6px; accent-color: var(--accent); }
+body.dropping .stage { outline: 2px dashed var(--accent); outline-offset: 8px; border-radius: 4px; }
 .credits { max-width: 72ch; line-height: 1.5; }
 .credits a { color: var(--accent); }
 @media (max-width: 900px) {
@@ -180,6 +203,12 @@ canvas {
       <label for="track">Audio file
         <select id="track"></select>
       </label>
+      <div class="upload">
+        <input type="file" id="file" accept="audio/*,.mp3,.wav,.ogg,.oga,.flac,.m4a" class="visually-hidden">
+        <label for="file" class="file-button" id="file-label">Use your own audio</label>
+        <progress id="upload-progress" max="1" value="0" hidden></progress>
+        <p class="hint" id="upload-status">Choose or drop a file. It is analyzed in this browser and never uploaded.</p>
+      </div>
     </fieldset>
 
     <fieldset>
@@ -253,11 +282,11 @@ canvas {
   <main class="stage">
     <div class="boards">
       <figure>
-        <figcaption><span>Rings</span><span>start at center, end at corners</span></figcaption>
+        <figcaption><span>Rings <small>start at center, end at corners</small></span><button type="button" class="fs" data-view="rings">Full screen</button></figcaption>
         <canvas id="rings" width="500" height="500" aria-label="Track rendered in the rings layout"></canvas>
       </figure>
       <figure>
-        <figcaption><span>Hilbert</span><span>nearby moments stay nearby</span></figcaption>
+        <figcaption><span>Hilbert <small>nearby moments stay nearby</small></span><button type="button" class="fs" data-view="hilbert">Full screen</button></figcaption>
         <canvas id="hilbert" width="500" height="500" aria-label="Track rendered in the Hilbert layout"></canvas>
       </figure>
     </div>
@@ -274,6 +303,11 @@ canvas {
         <button type="button" id="copy">Copy settings</button>
       </div>
       <pre id="settings-json"></pre>
+    </div>
+
+    <div class="viewer" id="viewer" role="dialog" aria-modal="true" aria-labelledby="viewer-title" hidden>
+      <div class="viewer-bar"><span id="viewer-title"></span><button type="button" id="viewer-close">Close</button></div>
+      <canvas id="viewer-canvas" width="500" height="500"></canvas>
     </div>
 
     <p class="hint credits">Example tracks: Chopin, Nocturne Op. 9 No. 2, performed by Peter Johnston via Musopen (CC0). Beethoven, Symphony No. 8, iv. Allegro vivace, Musopen recording (public domain). "Hitman" by Kevin MacLeod (incompetech.com), licensed under <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>. All from Wikimedia Commons.</p>
@@ -403,18 +437,28 @@ function rankOf(values, voiced) {
 async function loadTrack(name) {
   if (cache[name]) return cache[name];
   const raw = await (await fetch(`data/${name}.json`)).json();
-  const loud = decode(raw.loudness), freq = decode(raw.frequency), midiHalf = decode(raw.midi_half), noteIndex = decode(raw.note_index);
-  const voiced = new Uint8Array(N), midi = new Float32Array(N), octave = new Float32Array(N), pc = new Int8Array(N);
+  return buildTrack(name, {
+    loudness: Float32Array.from(decode(raw.loudness), v => v / 255),
+    frequency: Float32Array.from(decode(raw.frequency), v => v / 255),
+    midi: Float32Array.from(decode(raw.midi_half), v => v / 2),
+    noteIndex: decode(raw.note_index),
+    duration: raw.duration_s, windowMs: raw.window_ms,
+  });
+}
+
+// Shared by exported tracks and files analyzed in the browser
+function buildTrack(name, data) {
+  const { noteIndex, midi } = data;
+  const voiced = new Uint8Array(N), octave = new Float32Array(N), pc = new Int8Array(N);
   for (let i = 0; i < N; i++) {
     voiced[i] = noteIndex[i] > 0 ? 1 : 0;
-    midi[i] = midiHalf[i] / 2;
     const h = noteIndex[i] - 1;  // semitones above C0, exactly as genSound names notes
     pc[i] = voiced[i] ? h % 12 : -1;
     octave[i] = voiced[i] ? Math.floor(h / 12) : 0;
   }
   const src = {
-    loudness: Float32Array.from(loud, v => v / 255),
-    frequency: Float32Array.from(freq, v => v / 255),
+    loudness: data.loudness,
+    frequency: data.frequency,
     pitch: rankOf(midi, voiced),
     octave: new Float32Array(N),
     note: new Float32Array(N),
@@ -429,7 +473,7 @@ async function loadTrack(name) {
     src.note[i] = (pc[i] + 0.5) / 12;
     src.gensound[i] = (pc[i] <= 3 ? 0.5 : pc[i] <= 8 ? 1.5 : 2.5) / 3;
   }
-  const t = { name, voiced, src, duration: raw.duration_s, windowMs: raw.window_ms, octaves: [lo, hi] };
+  const t = { name, voiced, src, duration: data.duration, windowMs: data.windowMs, octaves: [lo, hi] };
   cache[name] = t;
   return t;
 }
@@ -490,6 +534,7 @@ function render() {
     renderKey();
     renderSettings();
     saveSettings();
+    if (!$('viewer').hidden) copyToViewer();
   });
 }
 
@@ -608,6 +653,34 @@ function syncControls() {
   renderStops(); syncValues();
 }
 
+// ---------- full-screen view ----------
+let viewing = null, opener = null;
+function copyToViewer() {
+  const ctx = $('viewer-canvas').getContext('2d');
+  ctx.clearRect(0, 0, SIDE, SIDE);
+  ctx.drawImage($(viewing), 0, 0);
+}
+function openViewer(id, button) {
+  viewing = id; opener = button;
+  $('viewer-title').textContent = `${id === 'rings' ? 'Rings' : 'Hilbert'} · ${track ? track.name : ''}`;
+  copyToViewer();
+  $('viewer').hidden = false;
+  $('viewer-close').focus();
+  // Real full screen where the browser allows it; the overlay already fills the window otherwise
+  $('viewer').requestFullscreen?.().catch(() => {});
+}
+function closeViewer() {
+  if ($('viewer').hidden) return;
+  $('viewer').hidden = true;
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  opener?.focus();
+}
+document.querySelectorAll('.fs').forEach(b => b.addEventListener('click', () => openViewer(b.dataset.view, b)));
+$('viewer-close').addEventListener('click', closeViewer);
+$('viewer').addEventListener('click', e => { if (e.target === $('viewer')) closeViewer(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeViewer(); });
+document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) closeViewer(); });
+
 $('copy').addEventListener('click', async () => {
   const text = $('settings-json').textContent;
   try { await navigator.clipboard.writeText(text); $('copy').textContent = 'Copied'; }
@@ -633,17 +706,94 @@ async function selectTrack(name) {
   }
   const mins = Math.floor(track.duration / 60), secs = (track.duration % 60).toFixed(1).padStart(4, '0');
   const hop = ((track.duration - track.windowMs / 1000) / (N - 1) * 1000).toFixed(2);
-  $('stats').textContent = `${name} · ${mins}:${secs} · ${N.toLocaleString()} windows of ${track.windowMs} ms, one every ${hop} ms`;
+  $('stats').textContent = `${track.name} · ${mins}:${secs} · ${N.toLocaleString()} windows of ${track.windowMs} ms, one every ${hop} ms`;
   render();
 }
 $('track').addEventListener('change', e => selectTrack(e.target.value));
+
+// ---------- your own audio, analyzed in this browser ----------
+const MAX_MINUTES = 15;
+const STAGES = { 'Measuring loudness': 0.05, 'Finding frequencies': 0.55, 'Detecting pitch': 0.38, 'Finishing': 0.02 };
+let analyzing = false;
+function setUploadStatus(text, fraction) {
+  $('upload-status').textContent = text;
+  $('upload-progress').hidden = fraction === undefined;
+  if (fraction !== undefined) $('upload-progress').value = fraction;
+}
+async function decodeFile(file) {
+  // Decode at 44.1 kHz and mix to mono, as librosa does when loading
+  const ctx = new OfflineAudioContext(1, 1, 44100);
+  const audio = await ctx.decodeAudioData(await file.arrayBuffer());
+  const mono = new Float32Array(audio.length);
+  for (let c = 0; c < audio.numberOfChannels; c++) {
+    const ch = audio.getChannelData(c);
+    for (let i = 0; i < ch.length; i++) mono[i] += ch[i] / audio.numberOfChannels;
+  }
+  return { samples: mono, sampleRate: audio.sampleRate };
+}
+function runAnalysis(samples, sampleRate) {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker('analyzer.js');
+    const order = Object.keys(STAGES);
+    let done = 0;
+    worker.onmessage = e => {
+      const m = e.data;
+      if (m.type === 'progress') {
+        const before = order.slice(0, order.indexOf(m.stage)).reduce((a, k) => a + STAGES[k], 0);
+        done = Math.max(done, 0.1 + 0.9 * (before + STAGES[m.stage] * m.fraction));
+        setUploadStatus(`${m.stage}… ${Math.round(done * 100)}%`, done);
+      } else if (m.type === 'done') { worker.terminate(); resolve(m.result); }
+      else { worker.terminate(); reject(new Error(m.message)); }
+    };
+    worker.onerror = e => { worker.terminate(); reject(new Error(e.message || 'The analysis stopped unexpectedly.')); };
+    worker.postMessage({ samples, sampleRate, nWindows: N }, [samples.buffer]);
+  });
+}
+async function useFile(file) {
+  if (!file || analyzing) return;
+  analyzing = true; $('file').disabled = true;
+  const name = file.name.replace(/\.[^.]+$/, '');
+  try {
+    setUploadStatus(`Reading ${file.name}…`, 0.02);
+    let decoded;
+    try { decoded = await decodeFile(file); }
+    catch { throw new Error(`This browser could not read ${file.name}. Try an MP3, WAV, OGG or M4A file.`); }
+    const seconds = decoded.samples.length / decoded.sampleRate;
+    if (seconds > MAX_MINUTES * 60) throw new Error(`${file.name} is ${(seconds / 60).toFixed(1)} minutes long. Choose a file under ${MAX_MINUTES} minutes.`);
+    if (seconds < 1) throw new Error(`${file.name} is shorter than a second. Choose a longer file.`);
+    setUploadStatus('Starting analysis…', 0.1);
+    const r = await runAnalysis(decoded.samples, decoded.sampleRate);
+    const key = `file:${name}`;
+    cache[key] = buildTrack(name, { loudness: r.loudness, frequency: r.frequency, midi: r.midi, noteIndex: r.noteIndex, duration: r.duration, windowMs: 100 });
+    let option = [...$('track').options].find(o => o.value === key);
+    if (!option) { option = document.createElement('option'); option.value = key; $('track').prepend(option); }
+    option.textContent = `Your file: ${name}`;
+    $('track').value = key;
+    await selectTrack(key);
+    setUploadStatus(`Done. ${name} was analyzed in this browser; nothing was uploaded.`);
+  } catch (err) {
+    setUploadStatus(err.message || 'Something went wrong while analyzing. Try another file.');
+  } finally {
+    analyzing = false; $('file').disabled = false; $('file').value = '';
+  }
+}
+$('file').addEventListener('change', e => useFile(e.target.files[0]));
+document.addEventListener('dragover', e => {
+  if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) { e.preventDefault(); document.body.classList.add('dropping'); }
+});
+document.addEventListener('dragleave', e => { if (!e.relatedTarget) document.body.classList.remove('dropping'); });
+document.addEventListener('drop', e => {
+  if (!e.dataTransfer || !e.dataTransfer.files.length) return;
+  e.preventDefault(); document.body.classList.remove('dropping');
+  useFile(e.dataTransfer.files[0]);
+});
 
 async function start() {
   syncControls();
   let names = [];
   try { names = (await (await fetch('data/manifest.json')).json()).tracks; } catch {}
   if (!names.length) {
-    $('stats').textContent = 'No tracks yet. Put audio files in audio/, run export_playground_data.py, then reload.';
+    $('stats').textContent = 'No example tracks loaded. Choose an audio file to begin.';
     return;
   }
   $('track').innerHTML = names.map(n => `<option value="${n}">${n}</option>`).join('');
