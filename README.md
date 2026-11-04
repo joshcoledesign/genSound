@@ -134,6 +134,9 @@ The full-screen toolbar also includes **PNG size** and **Download PNG** for the
 layout being viewed. Size choices stay synchronized with the main page. Saving
 keeps the viewer open, and success, credit and error messages appear inside it.
 The toolbar wraps on narrow screens while the artwork fits the available space.
+Use the **Rings / Hilbert** toggle in that toolbar to switch layouts without
+leaving the viewer. The preview, title, selected toggle and download follow the
+active layout while retaining the chosen PNG size.
 
 ```bash
 node tests/download-browser.mjs <lab-url> <report.json>

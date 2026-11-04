@@ -327,7 +327,7 @@ body.dropping .stage { outline: 2px dashed var(--accent); outline-offset: 8px; b
     </div>
 
     <div class="viewer" id="viewer" role="dialog" aria-modal="true" aria-labelledby="viewer-title" hidden>
-      <div class="viewer-bar"><span id="viewer-title"></span><div class="viewer-controls"><label for="viewer-export-size">PNG size <select id="viewer-export-size"></select></label><button type="button" class="download" id="viewer-download" aria-label="Download full-screen artwork as PNG" disabled>Download PNG</button><button type="button" id="viewer-close">Close</button></div></div>
+      <div class="viewer-bar"><span id="viewer-title"></span><div class="viewer-controls"><div class="seg" id="viewer-layout-toggle" role="group" aria-label="Layout"><button type="button" data-viewer-layout="rings" aria-pressed="true">Rings</button><button type="button" data-viewer-layout="hilbert" aria-pressed="false">Hilbert</button></div><label for="viewer-export-size">PNG size <select id="viewer-export-size"></select></label><button type="button" class="download" id="viewer-download" aria-label="Download full-screen artwork as PNG" disabled>Download PNG</button><button type="button" id="viewer-close">Close</button></div></div>
       <canvas id="viewer-canvas" width="500" height="500"></canvas>
       <p class="hint viewer-status" id="viewer-download-status" role="status"></p>
     </div>
@@ -692,12 +692,18 @@ function copyToViewer() {
   ctx.clearRect(0, 0, SIDE, SIDE);
   ctx.drawImage($(viewing), 0, 0);
 }
-function openViewer(id, button) {
-  viewing = id; opener = button;
-  $('viewer-export-size').value = $('export-size').value;
+function setViewerLayout(id) {
+  viewing = id;
+  opener = document.querySelector(`.fs[data-view="${id}"]`);
+  document.querySelectorAll('[data-viewer-layout]').forEach(button => button.setAttribute('aria-pressed', button.dataset.viewerLayout === id));
   $('viewer-title').textContent = `${id === 'rings' ? 'Rings' : 'Hilbert'} · ${track ? track.name : ''}`;
   $('viewer-download-status').textContent = '';
   copyToViewer();
+  updateDownloadButtons();
+}
+function openViewer(id, button) {
+  setViewerLayout(id); opener = button;
+  $('viewer-export-size').value = $('export-size').value;
   $('viewer').hidden = false;
   updateDownloadButtons();
   $('viewer-close').focus();
@@ -712,6 +718,7 @@ function closeViewer() {
   opener?.focus();
 }
 document.querySelectorAll('.fs').forEach(b => b.addEventListener('click', () => openViewer(b.dataset.view, b)));
+document.querySelectorAll('[data-viewer-layout]').forEach(button => button.addEventListener('click', () => setViewerLayout(button.dataset.viewerLayout)));
 $('viewer-close').addEventListener('click', closeViewer);
 $('viewer').addEventListener('click', e => { if (e.target === $('viewer')) closeViewer(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeViewer(); });
