@@ -202,8 +202,8 @@ body.dropping .stage { outline: 2px dashed var(--accent); outline-offset: 8px; b
 <div class="app">
   <header>
     <div class="title-row"><h1>genSound Color Lab</h1><a class="source-link" href="https://github.com/joshcoledesign/genSound" target="_blank" rel="noopener noreferrer">View source on GitHub ↗</a></div>
-    <p class="thesis">A song unfolds over minutes. genSound turns it into a single image, so the whole piece can be seen at once.</p>
-    <p class="about">It listens to a track in 250,000 overlapping moments, each a tenth of a second long, and measures three things in every one: the note being played, how loud it is, and its strongest frequency. Each moment becomes one point of color. By default the note picks the hue, loudness sets the saturation, and frequency sets the lightness; silence stays black. The lab shows the same analysis two ways: as rings that grow outward from the opening, and as a Hilbert curve that keeps nearby moments together. Change the palette and the color rules to see how each one changes the picture.</p>
+    <p class="thesis">genSound maps selected audio features across a track into one image. Change the color rules and layout to compare the results.</p>
+    <p class="about">The lab samples 250,000 overlapping windows across a track. Each window is 100 milliseconds long and becomes one colored point. It estimates pitch, measures signal level, and finds a peak frequency. The default uses estimated note groups for hue, relative signal level for saturation, and relative peak frequency for lightness. Windows below the level threshold, or without a pitch estimate, appear black. Both layouts use the same analysis. Rings place the opening near the center and later windows farther out. The Hilbert layout follows a continuous path through the image. Change the palette or mapping rules while keeping the track fixed to compare the results. The values are scaled within each recording, so the colors show relative differences within a track. The pitch values are estimates. The image represents selected features rather than a transcription of every note.</p>
     <span class="stats" id="stats">Loading…</span>
   </header>
 
@@ -285,7 +285,7 @@ body.dropping .stage { outline: 2px dashed var(--accent); outline-offset: 8px; b
 
     <fieldset>
       <legend>Silence</legend>
-      <label for="silence">Silent windows <span class="stop"><input type="color" id="silence"></span></label>
+      <label for="silence">Below threshold or no pitch estimate <span class="stop"><input type="color" id="silence"></span></label>
     </fieldset>
   </aside>
 
