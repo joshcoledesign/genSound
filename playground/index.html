@@ -55,6 +55,10 @@ header {
   color: var(--muted);
   line-height: 1.55;
 }
+.title-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.source-link { color: var(--accent); font-size: 13px; }
+.export-options { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.export-options .hint { flex-basis: 100%; }
 h1 {
   margin: 0;
   font-size: 22px;
@@ -193,7 +197,7 @@ body.dropping .stage { outline: 2px dashed var(--accent); outline-offset: 8px; b
 
 <div class="app">
   <header>
-    <h1>genSound Color Lab</h1>
+    <div class="title-row"><h1>genSound Color Lab</h1><a class="source-link" href="https://github.com/joshcoledesign/genSound" target="_blank" rel="noopener noreferrer">View source on GitHub ↗</a></div>
     <p class="thesis">A song unfolds over minutes. genSound turns it into a single image, so the whole piece can be seen at once.</p>
     <p class="about">It listens to a track in 250,000 overlapping moments, each a tenth of a second long, and measures three things in every one: the note being played, how loud it is, and its strongest frequency. Each moment becomes one point of color. By default the note picks the hue, loudness sets the saturation, and frequency sets the lightness; silence stays black. The lab shows the same analysis two ways: as rings that grow outward from the opening, and as a Hilbert curve that keeps nearby moments together. Change the palette and the color rules to see how each one changes the picture.</p>
     <span class="stats" id="stats">Loading…</span>
@@ -282,6 +286,15 @@ body.dropping .stage { outline: 2px dashed var(--accent); outline-offset: 8px; b
   </aside>
 
   <main class="stage">
+    <div class="export-options">
+      <label for="export-size">PNG size
+        <select id="export-size">
+          <option value="2000">2000 × 2000</option>
+          <option value="500">500 × 500</option>
+        </select>
+      </label>
+      <p class="hint">Large PNGs preserve each original point as a crisp 4 × 4 block.</p>
+    </div>
     <div class="boards">
       <figure>
         <figcaption><span>Rings <small>start at center, end at corners</small></span><span class="layout-actions"><button type="button" class="download" data-download="rings" aria-label="Download Rings artwork as PNG" disabled>Download PNG</button><button type="button" class="fs" data-view="rings">Full screen</button></span></figcaption>
@@ -727,12 +740,21 @@ async function downloadArtwork(layout) {
   if (!track || loadingTrack || downloading.has(layout)) return;
   renderNow(); // Include a palette/slider change whose coalesced redraw is pending.
   const name = track.name, source = $('track').value, credit = EXAMPLE_CREDITS[source] || '';
+  const size = $('export-size').value === '2000' ? 2000 : SIDE;
   const slug = name.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80) || 'audio';
-  const filename = `gensound-${slug}-${layout}.png`;
-  const description = JSON.stringify({ track: name, layout, width: SIDE, height: SIDE, settings: JSON.parse($('settings-json').textContent) });
+  const filename = `gensound-${slug}-${layout}${size === SIDE ? '' : `-${size}x${size}`}.png`;
+  const description = JSON.stringify({ track: name, layout, width: size, height: size, sourceWidth: SIDE, sourceHeight: SIDE, scaling: size === SIDE ? 'native' : 'nearest-neighbor', settings: JSON.parse($('settings-json').textContent) });
   downloading.add(layout); updateDownloadButtons();
   try {
-    const canvas = $(layout);
+    let canvas = $(layout);
+    if (size !== SIDE) {
+      const scaled = document.createElement('canvas');
+      scaled.width = scaled.height = size;
+      const ctx = scaled.getContext('2d');
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(canvas, 0, 0, size, size);
+      canvas = scaled;
+    }
     const encoded = await new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('PNG encoding failed')), 'image/png'));
     const bytes = new Uint8Array(await encoded.arrayBuffer());
     const metadata = [pngTextChunk('Title', `${name} — ${layout === 'rings' ? 'Rings' : 'Hilbert'}`), pngTextChunk('Software', 'genSound https://github.com/joshcoledesign/genSound'), pngTextChunk('Description', description)];
@@ -743,7 +765,7 @@ async function downloadArtwork(layout) {
     link.href = url; link.download = filename;
     document.body.append(link); link.click(); link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    $('download-status').textContent = `Saved ${filename} · ${SIDE} × ${SIDE} px.` + (source === 'macleod-hitman' ? ' When sharing this artwork, credit Kevin MacLeod (CC BY 4.0).' : '');
+    $('download-status').textContent = `Saved ${filename} · ${size} × ${size} px.` + (source === 'macleod-hitman' ? ' When sharing this artwork, credit Kevin MacLeod (CC BY 4.0).' : '');
   } catch {
     $('download-status').textContent = 'Could not create the PNG. Try again.';
   } finally {
