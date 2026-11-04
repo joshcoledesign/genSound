@@ -148,14 +148,18 @@ figcaption small { color: var(--muted); font-size: 12px; margin-left: 6px; }
 .download:disabled { opacity: 0.5; cursor: progress; }
 .viewer {
   position: fixed; inset: 0; z-index: 20; background: var(--bg);
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  display: grid; grid-template-rows: auto minmax(0, 1fr) auto; justify-items: center; gap: 12px;
   padding: calc(16px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
 }
 .viewer[hidden] { display: none; }
-.viewer-bar { width: min(100%, calc(100vh - 96px)); display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 13px; }
+.viewer-bar { width: 100%; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; font-size: 13px; }
+#viewer-title { min-width: 0; overflow-wrap: anywhere; }
+.viewer-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.viewer-controls button, .viewer-controls select { min-height: 36px; }
+.viewer-status { width: 100%; overflow-wrap: anywhere; }
 .viewer canvas {
-  width: min(100%, calc(100vh - 96px)); height: auto; aspect-ratio: 1; image-rendering: pixelated;
-  background: #000; border-radius: 3px;
+  width: 100%; height: 100%; min-height: 0; aspect-ratio: auto; object-fit: contain; image-rendering: pixelated;
+  background: transparent; border-radius: 3px;
 }
 canvas {
   width: 100%; max-width: 100%; aspect-ratio: 1; height: auto; display: block;
@@ -323,8 +327,9 @@ body.dropping .stage { outline: 2px dashed var(--accent); outline-offset: 8px; b
     </div>
 
     <div class="viewer" id="viewer" role="dialog" aria-modal="true" aria-labelledby="viewer-title" hidden>
-      <div class="viewer-bar"><span id="viewer-title"></span><button type="button" id="viewer-close">Close</button></div>
+      <div class="viewer-bar"><span id="viewer-title"></span><div class="viewer-controls"><label for="viewer-export-size">PNG size <select id="viewer-export-size"></select></label><button type="button" class="download" id="viewer-download" aria-label="Download full-screen artwork as PNG" disabled>Download PNG</button><button type="button" id="viewer-close">Close</button></div></div>
       <canvas id="viewer-canvas" width="500" height="500"></canvas>
+      <p class="hint viewer-status" id="viewer-download-status" role="status"></p>
     </div>
 
     <p class="hint credits">Example tracks: Chopin, Nocturne Op. 9 No. 2, performed by Peter Johnston via Musopen (CC0). Beethoven, Symphony No. 8, iv. Allegro vivace, Musopen recording (public domain). "Hitman" by Kevin MacLeod (incompetech.com), licensed under <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>. All from Wikimedia Commons.</p>
@@ -689,9 +694,12 @@ function copyToViewer() {
 }
 function openViewer(id, button) {
   viewing = id; opener = button;
+  $('viewer-export-size').value = $('export-size').value;
   $('viewer-title').textContent = `${id === 'rings' ? 'Rings' : 'Hilbert'} · ${track ? track.name : ''}`;
+  $('viewer-download-status').textContent = '';
   copyToViewer();
   $('viewer').hidden = false;
+  updateDownloadButtons();
   $('viewer-close').focus();
   // Real full screen where the browser allows it; the overlay already fills the window otherwise
   $('viewer').requestFullscreen?.().catch(() => {});
@@ -699,6 +707,7 @@ function openViewer(id, button) {
 function closeViewer() {
   if ($('viewer').hidden) return;
   $('viewer').hidden = true;
+  updateDownloadButtons();
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   opener?.focus();
 }
@@ -719,6 +728,15 @@ function updateDownloadButtons() {
   document.querySelectorAll('[data-download]').forEach(button => {
     button.disabled = !track || loadingTrack || downloading.has(button.dataset.download);
   });
+  $('viewer-download').disabled = $('viewer').hidden || !viewing || !track || loadingTrack || downloading.has(viewing);
+}
+// One canonical size choice and one export path for both page and viewer.
+$('viewer-export-size').innerHTML = $('export-size').innerHTML;
+for (const id of ['export-size', 'viewer-export-size']) $(id).addEventListener('change', event => {
+  $('export-size').value = $('viewer-export-size').value = event.target.value;
+});
+function setDownloadStatus(text) {
+  $('download-status').textContent = $('viewer-download-status').textContent = text;
 }
 function pngTextChunk(keyword, text) {
   // Uncompressed UTF-8 iTXt, including CRC over chunk type and data.
@@ -765,14 +783,15 @@ async function downloadArtwork(layout) {
     link.href = url; link.download = filename;
     document.body.append(link); link.click(); link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    $('download-status').textContent = `Saved ${filename} · ${size} × ${size} px.` + (source === 'macleod-hitman' ? ' When sharing this artwork, credit Kevin MacLeod (CC BY 4.0).' : '');
+    setDownloadStatus(`Saved ${filename} · ${size} × ${size} px.` + (source === 'macleod-hitman' ? ' When sharing this artwork, credit Kevin MacLeod (CC BY 4.0).' : ''));
   } catch {
-    $('download-status').textContent = 'Could not create the PNG. Try again.';
+    setDownloadStatus('Could not create the PNG. Try again.');
   } finally {
     downloading.delete(layout); updateDownloadButtons();
   }
 }
 document.querySelectorAll('[data-download]').forEach(button => button.addEventListener('click', () => downloadArtwork(button.dataset.download)));
+$('viewer-download').addEventListener('click', () => downloadArtwork(viewing));
 
 $('copy').addEventListener('click', async () => {
   const text = $('settings-json').textContent;
@@ -797,7 +816,7 @@ function loadSettings() {
 async function selectTrack(name) {
   const request = ++trackRequest;
   loadingTrack = true; updateDownloadButtons();
-  $('download-status').textContent = '';
+  setDownloadStatus('');
   $('stats').textContent = `Loading ${name}…`;
   try {
     const loaded = await loadTrack(name);

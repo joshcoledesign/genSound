@@ -135,10 +135,76 @@ for (const name of (process.env.GENSOUND_TEST_BROWSERS || 'chromium,firefox,webk
       const pending = await verifyDownload('rings', await event, 'macleod-hitman');
       assert.equal(JSON.parse(pending.metadata.Description).settings.hue.picked_by, 'time');
       assert.notEqual(exports.at(-1).pixelsSha256, exports.at(-3).pixelsSha256);
-      await page.locator('[data-view="rings"]').click();
-      await page.locator('#viewer').waitFor({ state: 'visible' });
-      await page.locator('#viewer-close').click();
-      await page.locator('#viewer').waitFor({ state: 'hidden' });
+      const fullscreen = [];
+      for (const layout of ['rings', 'hilbert']) {
+        await page.locator('#export-size').selectOption('500');
+        await page.locator(`[data-view="${layout}"]`).click();
+        await page.locator('#viewer').waitFor({ state: 'visible' });
+        assert.equal(await page.locator('#viewer-export-size').inputValue(), '500');
+        for (const size of [500, 2000]) {
+          await page.locator('#viewer-export-size').selectOption(String(size));
+          assert.equal(await page.locator('#export-size').inputValue(), String(size));
+          const nativeBefore = await page.evaluate(() => document.fullscreenElement?.id === 'viewer');
+          const download = page.waitForEvent('download');
+          if (size === 2000) await page.locator('#viewer-download').press('Enter');
+          else await page.locator('#viewer-download').click();
+          await verifyDownload(layout, await download, 'macleod-hitman', size);
+          assert.equal(await page.locator('#viewer').isVisible(), true, 'Export must keep the viewer open');
+          assert.equal(await page.locator('#viewer-download').isEnabled(), true);
+          assert.match(await page.locator('#viewer-download-status').innerText(), new RegExp(`${size} × ${size}`));
+          const nativeAfter = await page.evaluate(() => document.fullscreenElement?.id === 'viewer');
+          if (nativeBefore) assert.equal(nativeAfter, true, 'Export must retain native fullscreen');
+          const previewHash = await page.locator('#viewer-canvas').evaluate(async canvas => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', canvas.getContext('2d').getImageData(0, 0, 500, 500).data)), value => value.toString(16).padStart(2, '0')).join(''));
+          assert.equal(previewHash, exports.at(-1).sourcePixelsSha256, 'Export must match the active preview');
+          const bounds = await page.locator('#viewer').evaluate(viewer => {
+            const ids = ['viewer-export-size', 'viewer-download', 'viewer-close', 'viewer-canvas', 'viewer-download-status'];
+            return { viewport: { width: innerWidth, height: innerHeight }, items: ids.map(id => { const r = viewer.querySelector('#' + id).getBoundingClientRect(); return { id, left: r.left, top: r.top, right: r.right, bottom: r.bottom }; }) };
+          });
+          for (const item of bounds.items) {
+            assert.ok(item.left >= -1 && item.top >= -1 && item.right <= bounds.viewport.width + 1 && item.bottom <= bounds.viewport.height + 1, JSON.stringify(bounds));
+          }
+          fullscreen.push({ layout, size, native: nativeAfter, stayedOpen: true, controlsFit: true });
+          if (name === 'chromium' && layout === 'rings' && size === 2000 && process.env.GENSOUND_SCREENSHOT_DIR) await page.screenshot({ path: `${process.env.GENSOUND_SCREENSHOT_DIR}/gensound-viewer-${width}.png` });
+        }
+        await page.locator('#viewer-close').click();
+        await page.locator('#viewer').waitFor({ state: 'hidden' });
+        assert.equal(await page.locator('#export-size').inputValue(), '2000');
+      }
+      await page.locator('#export-size').selectOption('500');
+      const fallback = [];
+      if (name === 'chromium' && width === 1440) {
+        // Exercise the CSS viewer when browser/native fullscreen is unavailable.
+        await page.locator('#viewer').evaluate(viewer => { viewer.requestFullscreen = () => Promise.reject(new Error('Fullscreen unavailable in this test')); });
+        for (const viewport of [{ width: 844, height: 390 }, { width: 320, height: 640 }]) {
+          await page.setViewportSize(viewport);
+          await page.locator('#export-size').selectOption('500');
+          await page.locator('[data-view="rings"]').click();
+          await page.locator('#viewer').waitFor({ state: 'visible' });
+          assert.equal(await page.evaluate(() => document.fullscreenElement), null);
+          await page.evaluate(() => { document.getElementById('rings').toBlob = callback => callback(null); });
+          await page.locator('#viewer-download').click();
+          await page.locator('#viewer-download-status').filter({ hasText: 'Could not create the PNG' }).waitFor();
+          assert.equal(await page.locator('#viewer').isVisible(), true);
+          assert.equal(await page.locator('#viewer-download').isEnabled(), true);
+          await page.evaluate(() => { delete document.getElementById('rings').toBlob; });
+          for (const size of [500, 2000]) {
+            await page.locator('#viewer-export-size').selectOption(String(size));
+            const event = page.waitForEvent('download');
+            await page.locator('#viewer-download').click();
+            await verifyDownload('rings', await event, 'macleod-hitman', size);
+            assert.equal(await page.locator('#viewer').isVisible(), true);
+          }
+          const controlsFit = await page.locator('.viewer-controls').evaluate(controls => [...controls.querySelectorAll('button, select')].every(element => { const r = element.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight; }));
+          assert.equal(controlsFit, true);
+          await page.keyboard.press('Escape');
+          await page.locator('#viewer').waitFor({ state: 'hidden' });
+          assert.equal(await page.locator('#export-size').inputValue(), '2000');
+          fallback.push({ viewport, encodingRecovery: 'passed', bothSizes: 'passed', controlsFit, escapeCloses: true });
+        }
+        await page.locator('#viewer').evaluate(viewer => { delete viewer.requestFullscreen; });
+        await page.setViewportSize({ width, height: 1000 });
+        await page.locator('#export-size').selectOption('500');
+      }
       let ownAudio = 'not run at this viewport';
       if (width === 1440 && name !== 'webkit') {
         await page.locator('#file').setInputFiles({ name: 'Mélodie 2026 (test).wav', mimeType: 'audio/wav', buffer: toneWav() });
@@ -163,7 +229,7 @@ for (const name of (process.env.GENSOUND_TEST_BROWSERS || 'chromium,firefox,webk
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
       assert.deepEqual(errors, []);
       assert.equal(requests.some(request => request.method !== 'GET'), false, 'No audio or image upload');
-      results.push({ browser: name, version: browser.version(), width, exports, defaultExportSize: 2000, repositoryLink: 'passed', pendingRedraw: 'passed', loadingGuard: 'passed', fullscreen: 'passed', encodingFailureRecovery: 'passed', ownAudio, overflow: false, errors, requestsOtherThanGet: 0 });
+      results.push({ browser: name, version: browser.version(), width, exports, defaultExportSize: 2000, repositoryLink: 'passed', pendingRedraw: 'passed', loadingGuard: 'passed', fullscreen, fallback, sizeSyncBothDirections: 'passed', encodingFailureRecovery: 'passed', ownAudio, overflow: false, errors, requestsOtherThanGet: 0 });
       console.log(`${name} ${width}: ${exports.length} PNG exports passed`);
       await context.close();
     }
