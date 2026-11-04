@@ -122,9 +122,11 @@ for (const name of (process.env.GENSOUND_TEST_BROWSERS || 'chromium,firefox,webk
       await page.waitForFunction(color => JSON.parse(localStorage.getItem('gensound-lab-settings')).palette[0] === color, finalColor);
       await assertPreview('hilbert');
       await page.locator('#viewer-close').click();
+      await page.waitForFunction(() => document.fullscreenElement === null);
       assert.equal(await page.locator('.rail #palette-controls').count(), 1);
       assert.equal(await palette().first().inputValue(), finalColor);
       await palette().first().fill('#33aa77');
+      await page.waitForFunction(() => JSON.parse(localStorage.getItem('gensound-lab-settings')).palette[0] === '#33aa77');
       await page.locator('[data-view="hilbert"]').click();
       assert.equal(await palette().first().inputValue(), '#33aa77');
       await assertPreview('hilbert');
@@ -132,6 +134,7 @@ for (const name of (process.env.GENSOUND_TEST_BROWSERS || 'chromium,firefox,webk
       await page.locator('#viewer').waitFor({ state: 'hidden' });
       assert.equal(await page.locator('.rail #palette-controls').count(), 1);
       assert.equal(await page.locator('#palette-controls').count(), 1);
+      await page.waitForFunction(() => JSON.parse(localStorage.getItem('gensound-lab-settings')).palette[0] === '#33aa77');
       await page.reload();
       await page.locator('#stats').filter({ hasText: '250,000 windows' }).waitFor();
       assert.equal(await palette().first().inputValue(), '#33aa77');
