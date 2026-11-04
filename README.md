@@ -130,6 +130,11 @@ CC BY 4.0 credit as shown on the page and in the file.
 
 **View source on GitHub** in the lab header opens the public genSound repository.
 
+The full-screen toolbar also includes **PNG size** and **Download PNG** for the
+layout being viewed. Size choices stay synchronized with the main page. Saving
+keeps the viewer open, and success, credit and error messages appear inside it.
+The toolbar wraps on narrow screens while the artwork fits the available space.
+
 ```bash
 node tests/download-browser.mjs <lab-url> <report.json>
 ```
