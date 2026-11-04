@@ -157,6 +157,13 @@ figcaption small { color: var(--muted); font-size: 12px; margin-left: 6px; }
 .viewer-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .viewer-controls button, .viewer-controls select { min-height: 36px; }
 .viewer-status { width: 100%; overflow-wrap: anywhere; }
+.viewer-workspace { width: 100%; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 16px; }
+.viewer-palette { min-height: 0; overflow: auto; padding: 6px; }
+.viewer-palette .stops { gap: 12px; padding-top: 6px; }
+.viewer-palette .stop input[type="color"] { width: 44px; height: 44px; }
+.viewer-palette .stop button { display: block; width: 24px; height: 24px; line-height: 22px; }
+.viewer-palette .btns button, .viewer-palette .seg button { min-height: 36px; }
+.viewer-palette .row-label { flex-wrap: wrap; }
 .viewer canvas {
   width: 100%; height: 100%; min-height: 0; aspect-ratio: auto; object-fit: contain; image-rendering: pixelated;
   background: transparent; border-radius: 3px;
@@ -196,6 +203,8 @@ body.dropping .stage { outline: 2px dashed var(--accent); outline-offset: 8px; b
 }
 @media (max-width: 560px) {
   .boards { grid-template-columns: minmax(0, 1fr); }
+  .viewer-workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; gap: 8px; }
+  .viewer-palette { max-height: 40vh; }
 }
 </style>
 
@@ -226,7 +235,7 @@ body.dropping .stage { outline: 2px dashed var(--accent); outline-offset: 8px; b
       <div class="presets" id="presets"></div>
     </fieldset>
 
-    <fieldset>
+    <fieldset id="palette-controls">
       <legend>Palette</legend>
       <div class="stops" id="stops"></div>
       <div class="btns">
@@ -239,7 +248,7 @@ body.dropping .stage { outline: 2px dashed var(--accent); outline-offset: 8px; b
           <button type="button" id="blend-smooth" aria-pressed="false">Blend</button>
         </div>
       </div>
-      <p class="hint">Adding a fourth color switches Note group to Note name so the full palette can be used. Hover a color to remove it.</p>
+      <p class="hint">Adding a fourth color switches Note group to Note name so the full palette can be used. Use × to remove a color.</p>
     </fieldset>
 
     <fieldset>
@@ -328,7 +337,10 @@ body.dropping .stage { outline: 2px dashed var(--accent); outline-offset: 8px; b
 
     <div class="viewer" id="viewer" role="dialog" aria-modal="true" aria-labelledby="viewer-title" hidden>
       <div class="viewer-bar"><span id="viewer-title"></span><div class="viewer-controls"><div class="seg" id="viewer-layout-toggle" role="group" aria-label="Layout"><button type="button" data-viewer-layout="rings" aria-pressed="true">Rings</button><button type="button" data-viewer-layout="hilbert" aria-pressed="false">Hilbert</button></div><label for="viewer-export-size">PNG size <select id="viewer-export-size"></select></label><button type="button" class="download" id="viewer-download" aria-label="Download full-screen artwork as PNG" disabled>Download PNG</button><button type="button" id="viewer-close">Close</button></div></div>
-      <canvas id="viewer-canvas" width="500" height="500"></canvas>
+      <div class="viewer-workspace">
+        <canvas id="viewer-canvas" width="500" height="500"></canvas>
+        <div class="viewer-palette" id="viewer-palette"></div>
+      </div>
       <p class="hint viewer-status" id="viewer-download-status" role="status"></p>
     </div>
 
@@ -687,6 +699,9 @@ function syncControls() {
 
 // ---------- full-screen view ----------
 let viewing = null, opener = null;
+// Move one live palette between surfaces so values, handlers and persistence stay shared.
+const paletteHome = document.createComment('Palette controls home');
+$('palette-controls').before(paletteHome);
 function copyToViewer() {
   const ctx = $('viewer-canvas').getContext('2d');
   ctx.clearRect(0, 0, SIDE, SIDE);
@@ -704,6 +719,7 @@ function setViewerLayout(id) {
 function openViewer(id, button) {
   setViewerLayout(id); opener = button;
   $('viewer-export-size').value = $('export-size').value;
+  $('viewer-palette').append($('palette-controls'));
   $('viewer').hidden = false;
   updateDownloadButtons();
   $('viewer-close').focus();
@@ -713,6 +729,7 @@ function openViewer(id, button) {
 function closeViewer() {
   if ($('viewer').hidden) return;
   $('viewer').hidden = true;
+  paletteHome.after($('palette-controls'));
   updateDownloadButtons();
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   opener?.focus();

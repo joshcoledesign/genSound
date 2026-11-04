@@ -137,6 +137,11 @@ The toolbar wraps on narrow screens while the artwork fits the available space.
 Use the **Rings / Hilbert** toggle in that toolbar to switch layouts without
 leaving the viewer. The preview, title, selected toggle and download follow the
 active layout while retaining the chosen PNG size.
+The viewer also includes the live **Palette** controls: edit, add or remove colors,
+spread them around the wheel, or switch Hard steps/Blend. Changes redraw both
+layouts and the active preview immediately, persist, and appear in PNG downloads.
+The same controls return to their original place when the viewer closes. They sit
+beside the artwork on wide screens and in a scrollable area below it on phones.
 
 ```bash
 node tests/download-browser.mjs <lab-url> <report.json>
