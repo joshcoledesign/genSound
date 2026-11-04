@@ -137,9 +137,11 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .stage { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .boards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 figure { margin: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-figcaption { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; }
+figcaption { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; }
 figcaption small { color: var(--muted); font-size: 12px; margin-left: 6px; }
-.fs { font-size: 12px; padding: 3px 8px; }
+.layout-actions { display: flex; gap: 6px; margin-left: auto; }
+.fs, .download { font-size: 12px; padding: 3px 8px; }
+.download:disabled { opacity: 0.5; cursor: progress; }
 .viewer {
   position: fixed; inset: 0; z-index: 20; background: var(--bg);
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
@@ -282,14 +284,16 @@ body.dropping .stage { outline: 2px dashed var(--accent); outline-offset: 8px; b
   <main class="stage">
     <div class="boards">
       <figure>
-        <figcaption><span>Rings <small>start at center, end at corners</small></span><button type="button" class="fs" data-view="rings">Full screen</button></figcaption>
+        <figcaption><span>Rings <small>start at center, end at corners</small></span><span class="layout-actions"><button type="button" class="download" data-download="rings" aria-label="Download Rings artwork as PNG" disabled>Download PNG</button><button type="button" class="fs" data-view="rings">Full screen</button></span></figcaption>
         <canvas id="rings" width="500" height="500" aria-label="Track rendered in the rings layout"></canvas>
       </figure>
       <figure>
-        <figcaption><span>Hilbert <small>nearby moments stay nearby</small></span><button type="button" class="fs" data-view="hilbert">Full screen</button></figcaption>
+        <figcaption><span>Hilbert <small>nearby moments stay nearby</small></span><span class="layout-actions"><button type="button" class="download" data-download="hilbert" aria-label="Download Hilbert artwork as PNG" disabled>Download PNG</button><button type="button" class="fs" data-view="hilbert">Full screen</button></span></figcaption>
         <canvas id="hilbert" width="500" height="500" aria-label="Track rendered in the Hilbert layout"></canvas>
       </figure>
     </div>
+
+    <p class="hint" id="download-status" role="status"></p>
 
     <div class="key">
       <div class="row-label"><span id="key-title">Hue key</span></div>
@@ -345,6 +349,7 @@ const PRESETS = {
 
 let settings = loadSettings() || structuredClone(PRESETS['genSound today']);
 let track = null;
+let loadingTrack = false, trackRequest = 0;
 const cache = {};
 
 // ---------- color math (matches genSound's hsl_to_rgb) ----------
@@ -523,19 +528,22 @@ function paint(canvasId, order, rgb) {
 }
 
 let frame = 0;
+function renderNow() {
+  clearTimeout(frame);
+  if (!track) return;
+  const rgb = colorWindows(track);
+  paint('rings', LAYOUTS.rings, rgb);
+  paint('hilbert', LAYOUTS.hilbert, rgb);
+  renderKey();
+  renderSettings();
+  saveSettings();
+  updateDownloadButtons();
+  if (!$('viewer').hidden) copyToViewer();
+}
 function render() {
   // Coalesce rapid slider input into one redraw; a timer also runs in hidden views
   clearTimeout(frame);
-  frame = setTimeout(() => {
-    if (!track) return;
-    const rgb = colorWindows(track);
-    paint('rings', LAYOUTS.rings, rgb);
-    paint('hilbert', LAYOUTS.hilbert, rgb);
-    renderKey();
-    renderSettings();
-    saveSettings();
-    if (!$('viewer').hidden) copyToViewer();
-  });
+  frame = setTimeout(renderNow);
 }
 
 function renderKey() {
@@ -687,6 +695,63 @@ $('viewer').addEventListener('click', e => { if (e.target === $('viewer')) close
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeViewer(); });
 document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) closeViewer(); });
 
+// ---------- PNG downloads: keep the exact canvas pixels and recording credits ----------
+const downloading = new Set();
+const EXAMPLE_CREDITS = {
+  'chopin-nocturne-op9-no2': 'Chopin, Nocturne Op. 9 No. 2, performed by Peter Johnston via Musopen. CC0 1.0: https://creativecommons.org/publicdomain/zero/1.0/',
+  'beethoven-symphony-8-finale': 'Beethoven, Symphony No. 8, iv. Allegro vivace, Musopen recording. Public domain.',
+  'macleod-hitman': '"Hitman" by Kevin MacLeod (incompetech.com), licensed under CC BY 4.0: https://creativecommons.org/licenses/by/4.0/',
+};
+function updateDownloadButtons() {
+  document.querySelectorAll('[data-download]').forEach(button => {
+    button.disabled = !track || loadingTrack || downloading.has(button.dataset.download);
+  });
+}
+function pngTextChunk(keyword, text) {
+  // Uncompressed UTF-8 iTXt, including CRC over chunk type and data.
+  // https://www.w3.org/TR/png-3/#11iTXt
+  const payload = new TextEncoder().encode(keyword + '\0\0\0\0\0' + text.replaceAll('\0', ''));
+  const chunk = new Uint8Array(payload.length + 12), view = new DataView(chunk.buffer);
+  view.setUint32(0, payload.length);
+  chunk.set([105, 84, 88, 116], 4); // iTXt
+  chunk.set(payload, 8);
+  let crc = 0xffffffff;
+  for (const byte of chunk.subarray(4, chunk.length - 4)) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+  }
+  view.setUint32(chunk.length - 4, (crc ^ 0xffffffff) >>> 0);
+  return chunk;
+}
+async function downloadArtwork(layout) {
+  if (!track || loadingTrack || downloading.has(layout)) return;
+  renderNow(); // Include a palette/slider change whose coalesced redraw is pending.
+  const name = track.name, source = $('track').value, credit = EXAMPLE_CREDITS[source] || '';
+  const slug = name.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80) || 'audio';
+  const filename = `gensound-${slug}-${layout}.png`;
+  const description = JSON.stringify({ track: name, layout, width: SIDE, height: SIDE, settings: JSON.parse($('settings-json').textContent) });
+  downloading.add(layout); updateDownloadButtons();
+  try {
+    const canvas = $(layout);
+    const encoded = await new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('PNG encoding failed')), 'image/png'));
+    const bytes = new Uint8Array(await encoded.arrayBuffer());
+    const metadata = [pngTextChunk('Title', `${name} — ${layout === 'rings' ? 'Rings' : 'Hilbert'}`), pngTextChunk('Software', 'genSound https://github.com/joshcoledesign/genSound'), pngTextChunk('Description', description)];
+    if (credit) metadata.push(pngTextChunk('Copyright', credit + ' Audio analysis transformed into generative artwork with genSound.'));
+    // Canvas PNGs end in the fixed 12-byte IEND chunk. Metadata leaves IDAT untouched.
+    const blob = new Blob([bytes.subarray(0, -12), ...metadata, bytes.subarray(-12)], { type: 'image/png' });
+    const url = URL.createObjectURL(blob), link = document.createElement('a');
+    link.href = url; link.download = filename;
+    document.body.append(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    $('download-status').textContent = `Saved ${filename} · ${SIDE} × ${SIDE} px.` + (source === 'macleod-hitman' ? ' When sharing this artwork, credit Kevin MacLeod (CC BY 4.0).' : '');
+  } catch {
+    $('download-status').textContent = 'Could not create the PNG. Try again.';
+  } finally {
+    downloading.delete(layout); updateDownloadButtons();
+  }
+}
+document.querySelectorAll('[data-download]').forEach(button => button.addEventListener('click', () => downloadArtwork(button.dataset.download)));
+
 $('copy').addEventListener('click', async () => {
   const text = $('settings-json').textContent;
   try { await navigator.clipboard.writeText(text); $('copy').textContent = 'Copied'; }
@@ -708,10 +773,18 @@ function loadSettings() {
 }
 
 async function selectTrack(name) {
+  const request = ++trackRequest;
+  loadingTrack = true; updateDownloadButtons();
+  $('download-status').textContent = '';
   $('stats').textContent = `Loading ${name}…`;
   try {
-    track = await loadTrack(name);
+    const loaded = await loadTrack(name);
+    if (request !== trackRequest) return;
+    track = loaded;
+    loadingTrack = false;
   } catch {
+    if (request !== trackRequest) return;
+    track = null; loadingTrack = false; updateDownloadButtons();
     $('stats').textContent = `Could not load ${name}. Run export_playground_data.py, then reload the page.`;
     return;
   }
