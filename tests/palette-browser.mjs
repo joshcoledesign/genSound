@@ -132,6 +132,7 @@ for (const name of (process.env.GENSOUND_TEST_BROWSERS || 'chromium,firefox,webk
       await page.locator('#viewer').waitFor({ state: 'hidden' });
       assert.equal(await page.locator('.rail #palette-controls').count(), 1);
       assert.equal(await page.locator('#palette-controls').count(), 1);
+      await page.waitForFunction(() => JSON.parse(localStorage.getItem('gensound-lab-settings')).palette[0] === '#33aa77');
       await page.reload();
       await page.locator('#stats').filter({ hasText: '250,000 windows' }).waitFor();
       assert.equal(await palette().first().inputValue(), '#33aa77');
