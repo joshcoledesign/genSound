@@ -119,6 +119,24 @@ That is 250,000 overlapping windows and takes about 20 seconds for a 3-minute tr
 
 `playground/index.html` is genSound in the browser. It shows the rings and Hilbert layouts side by side, each with a full-screen view, and lets you try palettes and color rules live.
 
+Use **Download PNG** beside either layout to save its current artwork at the
+native 500 × 500 resolution. The PNG matches the canvas, including the current
+palette and shading. Its filename includes the track and layout; UTF-8 PNG text
+metadata retains the settings and approved example-track credits without adding
+text over the artwork. When sharing art made from Hitman, include Kevin MacLeod's
+CC BY 4.0 credit as shown on the page and in the file.
+
+```bash
+node tests/download-browser.mjs <lab-url> <report.json>
+```
+
+Verify actual PNG downloads, dimensions, chunk checksums, decoded pixel equality,
+filenames, metadata, current settings, loading guards and recovery after encoding
+failure. The test uses Node 22+ and an existing Playwright installation, with the
+same environment options as the palette regression below. Visitor-audio exports
+are exercised in Chromium and Firefox; Windows WebKit covers example exports
+because its Web Audio constructors are unavailable. Actual Safari is not covered.
+
 The original three-color preset keeps its note groups. Adding a fourth color
 switches the hue source to **Note name**, so the full palette is available.
 Previously saved palettes affected by the three-color limit are upgraded once.
