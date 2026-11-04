@@ -9,7 +9,7 @@ const url = process.argv[2];
 if (!url) throw new Error('Usage: node tests/download-browser.mjs <lab-url> [report.json]');
 const results = [];
 
-function pngInfo(bytes) {
+function pngInfo(bytes, size) {
   assert.equal(bytes.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
   const metadata = {}, chunks = [];
   for (let offset = 8; offset < bytes.length;) {
@@ -26,8 +26,8 @@ function pngInfo(bytes) {
   }
   assert.equal(chunks[0], 'IHDR'); assert.equal(chunks.at(-1), 'IEND');
   assert.ok(chunks.includes('IDAT'));
-  assert.equal(bytes.readUInt32BE(16), 500); assert.equal(bytes.readUInt32BE(20), 500);
-  return { width: 500, height: 500, metadata };
+  assert.equal(bytes.readUInt32BE(16), size); assert.equal(bytes.readUInt32BE(20), size);
+  return { width: size, height: size, metadata };
 }
 
 function toneWav() {
@@ -51,6 +51,13 @@ for (const name of (process.env.GENSOUND_TEST_BROWSERS || 'chromium,firefox,webk
       page.on('request', request => requests.push({ method: request.method(), url: request.url() }));
       await page.goto(url);
       await page.locator('[data-download="rings"]:enabled').waitFor();
+      assert.equal(await page.locator('#export-size').inputValue(), '2000');
+      const repository = page.getByRole('link', { name: 'View source on GitHub' });
+      assert.equal(await repository.getAttribute('href'), 'https://github.com/joshcoledesign/genSound');
+      assert.equal(await repository.isVisible(), true);
+      assert.equal(await repository.getAttribute('target'), '_blank');
+      assert.match(await repository.getAttribute('rel'), /noopener/);
+      await page.locator('#export-size').selectOption('500');
       const selectTrack = async track => {
         await page.locator('#track').selectOption(track);
         await page.locator('#stats').filter({ hasText: `${track} ·` }).waitFor();
@@ -68,30 +75,44 @@ for (const name of (process.env.GENSOUND_TEST_BROWSERS || 'chromium,firefox,webk
       release();
       await page.locator('[data-download="rings"]:enabled').waitFor();
       const exports = [];
-      const verifyDownload = async (layout, download, expectedName) => {
+      const verifyDownload = async (layout, download, expectedName, size = 500) => {
         assert.equal(await download.failure(), null);
-        assert.match(download.suggestedFilename(), /^gensound-[a-z0-9-]+-(rings|hilbert)\.png$/);
-        assert.ok(download.suggestedFilename().endsWith(`-${layout}.png`));
-        const bytes = await readFile(await download.path()), info = pngInfo(bytes);
+        assert.match(download.suggestedFilename(), /^gensound-[a-z0-9-]+-(rings|hilbert)(?:-2000x2000)?\.png$/);
+        assert.ok(download.suggestedFilename().endsWith(`-${layout}${size === 500 ? '' : '-2000x2000'}.png`));
+        const bytes = await readFile(await download.path()), info = pngInfo(bytes, size);
         const description = JSON.parse(info.metadata.Description);
         assert.equal(description.track, expectedName); assert.equal(description.layout, layout);
+        assert.equal(description.width, size); assert.equal(description.height, size);
+        assert.equal(description.sourceWidth, 500); assert.equal(description.sourceHeight, 500);
+        assert.equal(description.scaling, size === 500 ? 'native' : 'nearest-neighbor');
         assert.equal(info.metadata.Title, `${expectedName} — ${layout === 'rings' ? 'Rings' : 'Hilbert'}`);
-        const hashes = await page.evaluate(async ({ b64, layout }) => {
+        const hashes = await page.evaluate(async ({ b64, layout, size }) => {
           const hex = async data => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', data)), value => value.toString(16).padStart(2, '0')).join('');
           const image = new Image(); image.src = 'data:image/png;base64,' + b64; await image.decode();
           const decoded = document.createElement('canvas'); decoded.width = image.naturalWidth; decoded.height = image.naturalHeight;
           decoded.getContext('2d').drawImage(image, 0, 0);
-          return { exported: await hex(decoded.getContext('2d').getImageData(0, 0, 500, 500).data), displayed: await hex(document.getElementById(layout).getContext('2d').getImageData(0, 0, 500, 500).data) };
-        }, { b64: bytes.toString('base64'), layout });
-        assert.equal(hashes.exported, hashes.displayed, 'PNG must match displayed canvas pixels');
+          const actual = decoded.getContext('2d').getImageData(0, 0, size, size).data;
+          const original = document.getElementById(layout).getContext('2d').getImageData(0, 0, 500, 500).data;
+          const scale = size / 500;
+          let exact = true;
+          // Verify every output pixel against its original point, independently
+          // of Canvas scaling. This catches blur at every 4x4 block boundary.
+          for (let y = 0; y < size && exact; y++) for (let x = 0; x < size; x++) {
+            const a = (y * size + x) * 4, b = (Math.floor(y / scale) * 500 + Math.floor(x / scale)) * 4;
+            if (actual[a] !== original[b] || actual[a + 1] !== original[b + 1] || actual[a + 2] !== original[b + 2] || actual[a + 3] !== original[b + 3]) { exact = false; break; }
+          }
+          return { exported: await hex(actual), displayed: await hex(original), exact };
+        }, { b64: bytes.toString('base64'), layout, size });
+        assert.equal(hashes.exact, true, 'PNG must preserve every original point without interpolation');
+        if (size === 500) assert.equal(hashes.exported, hashes.displayed);
         assert.equal(await page.locator(`[data-download="${layout}"]`).isEnabled(), true);
-        exports.push({ filename: download.suggestedFilename(), bytes: bytes.length, layout, width: info.width, height: info.height, pixelsSha256: hashes.exported, metadata: info.metadata });
+        exports.push({ filename: download.suggestedFilename(), bytes: bytes.length, layout, width: info.width, height: info.height, exactPixelMapping: hashes.exact, pixelsSha256: hashes.exported, sourcePixelsSha256: hashes.displayed, metadata: info.metadata });
         return info;
       };
-      const save = async (layout, track) => {
+      const save = async (layout, track, size = 500) => {
         const event = page.waitForEvent('download');
         await page.getByRole('button', { name: `Download ${layout === 'rings' ? 'Rings' : 'Hilbert'} artwork as PNG`, exact: true }).click();
-        return verifyDownload(layout, await event, track);
+        return verifyDownload(layout, await event, track, size);
       };
       for (const track of ['chopin-nocturne-op9-no2', 'beethoven-symphony-8-finale', 'macleod-hitman']) {
         await selectTrack(track);
@@ -128,18 +149,21 @@ for (const name of (process.env.GENSOUND_TEST_BROWSERS || 'chromium,firefox,webk
         }
         ownAudio = 'passed with Unicode filename and both layouts';
       } else if (name === 'webkit') ownAudio = 'deferred: Windows WebKit lacks Web Audio constructors';
+      const currentName = await page.evaluate(() => track.name);
+      await page.locator('#export-size').selectOption('2000');
+      for (const layout of ['rings', 'hilbert']) await save(layout, currentName, 2000);
+      await page.locator('#export-size').selectOption('500');
       // Null encoding errors leave the controls usable for another attempt.
       await page.evaluate(() => { document.getElementById('rings').toBlob = callback => callback(null); });
       await page.locator('[data-download="rings"]').click();
       await page.locator('#download-status').filter({ hasText: 'Could not create the PNG' }).waitFor();
       assert.equal(await page.locator('[data-download="rings"]').isEnabled(), true);
       await page.evaluate(() => { delete document.getElementById('rings').toBlob; });
-      const currentName = await page.evaluate(() => track.name);
       await save('rings', currentName);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
       assert.deepEqual(errors, []);
       assert.equal(requests.some(request => request.method !== 'GET'), false, 'No audio or image upload');
-      results.push({ browser: name, version: browser.version(), width, exports, pendingRedraw: 'passed', loadingGuard: 'passed', fullscreen: 'passed', encodingFailureRecovery: 'passed', ownAudio, overflow: false, errors, requestsOtherThanGet: 0 });
+      results.push({ browser: name, version: browser.version(), width, exports, defaultExportSize: 2000, repositoryLink: 'passed', pendingRedraw: 'passed', loadingGuard: 'passed', fullscreen: 'passed', encodingFailureRecovery: 'passed', ownAudio, overflow: false, errors, requestsOtherThanGet: 0 });
       console.log(`${name} ${width}: ${exports.length} PNG exports passed`);
       await context.close();
     }

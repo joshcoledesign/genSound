@@ -119,18 +119,23 @@ That is 250,000 overlapping windows and takes about 20 seconds for a 3-minute tr
 
 `playground/index.html` is genSound in the browser. It shows the rings and Hilbert layouts side by side, each with a full-screen view, and lets you try palettes and color rules live.
 
-Use **Download PNG** beside either layout to save its current artwork at the
-native 500 × 500 resolution. The PNG matches the canvas, including the current
-palette and shading. Its filename includes the track and layout; UTF-8 PNG text
+Choose **PNG size**, then use **Download PNG** beside either layout. The default
+2000 × 2000 option preserves each point of the original 500 × 500 grid as a sharp
+4 × 4 block, with no interpolation. The native 500 × 500 option is also available.
+Both retain the current palette and shading. Filenames include the track, layout
+and larger export size; UTF-8 PNG text
 metadata retains the settings and approved example-track credits without adding
 text over the artwork. When sharing art made from Hitman, include Kevin MacLeod's
 CC BY 4.0 credit as shown on the page and in the file.
+
+**View source on GitHub** in the lab header opens the public genSound repository.
 
 ```bash
 node tests/download-browser.mjs <lab-url> <report.json>
 ```
 
-Verify actual PNG downloads, dimensions, chunk checksums, decoded pixel equality,
+Verify actual PNG downloads, both dimensions, chunk checksums, exact native or
+nearest-neighbor decoded pixel mapping, the public repository link,
 filenames, metadata, current settings, loading guards and recovery after encoding
 failure. The test uses Node 22+ and an existing Playwright installation, with the
 same environment options as the palette regression below. Visitor-audio exports
