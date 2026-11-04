@@ -81,6 +81,7 @@ for (const name of (process.env.GENSOUND_TEST_BROWSERS || 'chromium,firefox,webk
         assert.ok(download.suggestedFilename().endsWith(`-${layout}${size === 500 ? '' : '-2000x2000'}.png`));
         const bytes = await readFile(await download.path()), info = pngInfo(bytes, size);
         const description = JSON.parse(info.metadata.Description);
+        assert.deepEqual(description.settings, JSON.parse(await page.locator('#settings-json').textContent()));
         assert.equal(description.track, expectedName); assert.equal(description.layout, layout);
         assert.equal(description.width, size); assert.equal(description.height, size);
         assert.equal(description.sourceWidth, 500); assert.equal(description.sourceHeight, 500);
@@ -151,6 +152,10 @@ for (const name of (process.env.GENSOUND_TEST_BROWSERS || 'chromium,firefox,webk
         assert.equal(await page.locator(`[data-viewer-layout="${layout}"]`).getAttribute('aria-pressed'), 'true');
         assert.equal(await page.locator(`[data-viewer-layout="${layout === 'rings' ? 'hilbert' : 'rings'}"]`).getAttribute('aria-pressed'), 'false');
         assert.match(await page.locator('#viewer-title').innerText(), new RegExp('^' + (layout === 'rings' ? 'Rings' : 'Hilbert')));
+        assert.equal(await page.locator('#viewer #palette-controls').count(), 1);
+        await page.locator('#stop-0').fill(layout === 'rings' ? '#ff3300' : '#3355ff');
+        if (layout === 'rings') await page.locator('#add-stop').click();
+        await page.locator(layout === 'rings' ? '#blend-smooth' : '#blend-hard').click();
         for (const size of [500, 2000]) {
           await page.locator('#viewer-export-size').selectOption(String(size));
           assert.equal(await page.locator('#export-size').inputValue(), String(size));
@@ -167,7 +172,7 @@ for (const name of (process.env.GENSOUND_TEST_BROWSERS || 'chromium,firefox,webk
           const previewHash = await page.locator('#viewer-canvas').evaluate(async canvas => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', canvas.getContext('2d').getImageData(0, 0, 500, 500).data)), value => value.toString(16).padStart(2, '0')).join(''));
           assert.equal(previewHash, exports.at(-1).sourcePixelsSha256, 'Export must match the active preview');
           const bounds = await page.locator('#viewer').evaluate(viewer => {
-            const ids = ['viewer-layout-toggle', 'viewer-export-size', 'viewer-download', 'viewer-close', 'viewer-canvas', 'viewer-download-status'];
+            const ids = ['viewer-layout-toggle', 'viewer-export-size', 'viewer-download', 'viewer-close', 'viewer-canvas', 'viewer-palette', 'viewer-download-status'];
             return { viewport: { width: innerWidth, height: innerHeight }, items: ids.map(id => { const r = viewer.querySelector('#' + id).getBoundingClientRect(); return { id, left: r.left, top: r.top, right: r.right, bottom: r.bottom }; }) };
           });
           for (const item of bounds.items) {
@@ -187,6 +192,8 @@ for (const name of (process.env.GENSOUND_TEST_BROWSERS || 'chromium,firefox,webk
       assert.equal(await page.locator('#viewer').isVisible(), true);
       await page.locator('#viewer-close').click();
       await page.locator('#viewer').waitFor({ state: 'hidden' });
+      assert.equal(await page.locator('.rail #palette-controls').count(), 1);
+      assert.equal(await page.locator('#stop-0').inputValue(), '#3355ff');
       assert.equal(await page.locator('#export-size').inputValue(), '2000');
       await page.locator('#export-size').selectOption('500');
       const fallback = [];
@@ -199,6 +206,9 @@ for (const name of (process.env.GENSOUND_TEST_BROWSERS || 'chromium,firefox,webk
           await page.locator('[data-view="rings"]').click();
           await page.locator('#viewer').waitFor({ state: 'visible' });
           assert.equal(await page.evaluate(() => document.fullscreenElement), null);
+          await page.locator('#stop-0').fill('#11aa66');
+          await page.locator('#wheel').click();
+          await page.locator('#blend-smooth').click();
           await page.evaluate(() => { document.getElementById('rings').toBlob = callback => callback(null); });
           await page.locator('#viewer-download').click();
           await page.locator('#viewer-download-status').filter({ hasText: 'Could not create the PNG' }).waitFor();
@@ -216,8 +226,10 @@ for (const name of (process.env.GENSOUND_TEST_BROWSERS || 'chromium,firefox,webk
           }
           const controlsFit = await page.locator('.viewer-controls').evaluate(controls => [...controls.querySelectorAll('button, select')].every(element => { const r = element.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight; }));
           assert.equal(controlsFit, true);
+          assert.equal(await page.locator('#viewer-palette').evaluate(panel => panel.scrollWidth <= panel.clientWidth), true);
           await page.keyboard.press('Escape');
           await page.locator('#viewer').waitFor({ state: 'hidden' });
+          assert.equal(await page.locator('.rail #palette-controls').count(), 1);
           assert.equal(await page.locator('#export-size').inputValue(), '2000');
           fallback.push({ viewport, encodingRecovery: 'passed', bothSizes: 'passed', controlsFit, escapeCloses: true });
         }
@@ -249,7 +261,7 @@ for (const name of (process.env.GENSOUND_TEST_BROWSERS || 'chromium,firefox,webk
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
       assert.deepEqual(errors, []);
       assert.equal(requests.some(request => request.method !== 'GET'), false, 'No audio or image upload');
-      results.push({ browser: name, version: browser.version(), width, exports, defaultExportSize: 2000, repositoryLink: 'passed', pendingRedraw: 'passed', loadingGuard: 'passed', fullscreen, fallback, layoutToggleBothDirections: 'passed', layoutToggleKeyboard: 'passed', sizeSyncBothDirections: 'passed', encodingFailureRecovery: 'passed', ownAudio, overflow: false, errors, requestsOtherThanGet: 0 });
+      results.push({ browser: name, version: browser.version(), width, exports, defaultExportSize: 2000, repositoryLink: 'passed', pendingRedraw: 'passed', loadingGuard: 'passed', fullscreen, fallback, viewerPaletteExports: 'passed', paletteReturnedToRail: 'passed', layoutToggleBothDirections: 'passed', layoutToggleKeyboard: 'passed', sizeSyncBothDirections: 'passed', encodingFailureRecovery: 'passed', ownAudio, overflow: false, errors, requestsOtherThanGet: 0 });
       console.log(`${name} ${width}: ${exports.length} PNG exports passed`);
       await context.close();
     }
