@@ -119,6 +119,23 @@ That is 250,000 overlapping windows and takes about 20 seconds for a 3-minute tr
 
 `playground/index.html` is genSound in the browser. It shows the rings and Hilbert layouts side by side, each with a full-screen view, and lets you try palettes and color rules live.
 
+The original three-color preset keeps its note groups. Adding a fourth color
+switches the hue source to **Note name**, so the full palette is available.
+Previously saved palettes affected by the three-color limit are upgraded once.
+You can still choose **Note group** explicitly. As with any note-based mapping,
+colors assigned to notes absent from a track may not appear in that track.
+
+```bash
+node tests/palette-browser.mjs <lab-url> <report.json>
+```
+
+Check palette growth, rendered colors in both layouts, saved settings and preset
+behavior with existing Playwright Chromium, Firefox and WebKit installations.
+Set `PLAYWRIGHT_MODULE_PATH` if Playwright is installed outside this repository;
+`GENSOUND_TEST_BROWSERS` optionally selects a comma-separated subset. To check an
+unpublished page against existing example data, set `GENSOUND_TEST_HTML` to that
+HTML file. The test adds no package dependency and does not install browsers.
+
 **Use your own audio:** choose or drop a file (MP3, WAV, OGG, M4A; up to 15 minutes). `playground/analyzer.js` runs genSound's analysis in a Web Worker, so the file never leaves the browser. It matches the Python version: on the example tracks, note names and silence agree in every window and loudness is identical. The one difference is that the strongest frequency is measured every 10 ms rather than once per window, which keeps a 3-minute track to about 10 seconds.
 
 **Example tracks:** the page also lists tracks exported ahead of time (250,000 windows each, about 1 MB). To export the example tracks:
