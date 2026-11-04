@@ -229,7 +229,7 @@ body.dropping .stage { outline: 2px dashed var(--accent); outline-offset: 8px; b
           <button type="button" id="blend-smooth" aria-pressed="false">Blend</button>
         </div>
       </div>
-      <p class="hint">The hue source picks a place on this palette. Hover a color to remove it.</p>
+      <p class="hint">Adding a fourth color switches Note group to Note name so the full palette can be used. Hover a color to remove it.</p>
     </fieldset>
 
     <fieldset>
@@ -612,7 +612,13 @@ $('add-stop').addEventListener('click', () => {
   if (settings.palette.length >= 12) return;
   const last = hexToHsl(settings.palette[settings.palette.length - 1]);
   settings.palette.push(hslToHex(last[0] + 40, last[1] || 0.8, last[2] || 0.5));
-  renderStops(); render();
+  if (settings.hue === 'gensound' && settings.palette.length > 3) {
+    settings.hue = 'note';
+    syncControls();
+  } else {
+    renderStops();
+  }
+  render();
 });
 $('wheel').addEventListener('click', () => {
   const first = hexToHsl(settings.palette[0]);
@@ -688,11 +694,16 @@ $('copy').addEventListener('click', async () => {
   setTimeout(() => { $('copy').textContent = 'Copy settings'; }, 1800);
 });
 
-function saveSettings() { try { localStorage.setItem('gensound-lab-settings', JSON.stringify(settings)); } catch {} }
+function saveSettings() { try { localStorage.setItem('gensound-lab-settings', JSON.stringify({ ...settings, paletteMappingVersion: 1 })); } catch {} }
 function loadSettings() {
   try {
     const s = JSON.parse(localStorage.getItem('gensound-lab-settings'));
-    return s && Array.isArray(s.palette) && s.palette.length ? { ...PRESETS['genSound today'], ...s } : null;
+    if (!s || !Array.isArray(s.palette) || !s.palette.length) return null;
+    const restored = { ...PRESETS['genSound today'], ...s };
+    // Upgrade previously saved affected palettes once. An explicit group choice
+    // saved by this version remains available on subsequent visits.
+    if (!s.paletteMappingVersion && restored.hue === 'gensound' && restored.palette.length > 3) restored.hue = 'note';
+    return restored;
   } catch { return null; }
 }
 
